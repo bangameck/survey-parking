@@ -1,0 +1,23 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ----------------------------------------------------------------------
+    #  Aturan #1: Abaikan semua request untuk file aset yang ada
+    # ----------------------------------------------------------------------
+    # Jika request diakhiri dengan ekstensi file-file ini, hentikan
+    # proses rewrite dan layani sebagai file biasa.
+    RewriteRule \.(gif|jpe?g|png|webp|svg|ico|js|css|map|woff2?|ttf|otf|eot)$ - [NC,L]
+
+    # ----------------------------------------------------------------------
+    #  Aturan #2: Aturan Front Controller (jika bukan file/direktori)
+    # ----------------------------------------------------------------------
+    # Jika request BUKAN file yang ada secara fisik
+    RewriteCond %{REQUEST_FILENAME} !-f
+
+    # Dan jika request BUKAN direktori yang ada secara fisik
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Alihkan semua request lainnya ke index.php
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+
+</IfModule>
