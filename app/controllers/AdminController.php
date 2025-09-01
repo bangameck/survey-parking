@@ -20,16 +20,23 @@ class AdminController extends Controller
         $coordinatorModel = $this->model('FieldCoordinator');
         $depositModel     = $this->model('ParkingDeposit');
 
-        // Ambil data statistik
+        // Ambil data statistik dasar
         $total_locations        = $locationModel->getTotalCount();
         $surveyed_locations     = $depositModel->getSurveyedLocationsCount();
         $not_surveyed_locations = $total_locations - $surveyed_locations;
 
+        // Ambil data total semua setoran
+        $all_deposits = $depositModel->getTotalAllDeposits();
+        // Hitung total keseluruhan
+        $grand_total = ($all_deposits->total_daily ?? 0) + ($all_deposits->total_weekend ?? 0) + ($all_deposits->total_monthly ?? 0);
+
+        // Siapkan semua data untuk dikirim ke view
         $data['total_locations']          = $total_locations;
         $data['total_coordinators']       = count($coordinatorModel->getAll());
         $data['total_surveyed_locations'] = $surveyed_locations;
+        $data['grand_total_deposits']     = $grand_total; // Data BARU untuk kartu statistik
 
-        // Siapkan data khusus untuk chart
+        // Data untuk chart
         $data['chart_data'] = [
             'surveyed'     => $surveyed_locations,
             'not_surveyed' => $not_surveyed_locations,

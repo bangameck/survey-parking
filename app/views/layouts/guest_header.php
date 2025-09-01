@@ -1,8 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title><?php echo $title ?? 'Guest Area' ?> - Survey Parking</title>
 
     <link rel="stylesheet" href="<?php echo BASE_URL ?>/css/style.css">
@@ -13,8 +17,13 @@
 
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <style> [x-cloak] { display: none !important; } </style>
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
 </head>
+
 <body class="bg-gray-100">
 
     <nav class="bg-white shadow-md print:hidden">
@@ -24,8 +33,9 @@
                     <a href="<?php echo BASE_URL ?>/guest">Survey Parking</a>
                 </div>
                 <div class="mt-2 md:mt-0">
-                    <span class="text-gray-700 mr-4">Halo,                                                           <?php echo htmlspecialchars($_SESSION['username']) ?>!</span>
-                    <a href="<?php echo BASE_URL ?>/auth/logout" id="logout-link" class="px-4 py-2 bg-red-500 text-white text-sm rounded-md hover:bg-red-600 transition-colors">
+                    <span class="text-gray-700 mr-4">Halo, <?php echo htmlspecialchars($_SESSION['username']) ?>!</span>
+                    <a href="<?php echo BASE_URL ?>/auth/logout" id="logout-link"
+                        class="px-4 py-2 bg-red-500 text-white text-sm rounded-md hover:bg-red-600 transition-colors">
                         Logout
                     </a>
                 </div>

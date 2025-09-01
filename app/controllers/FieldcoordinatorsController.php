@@ -12,14 +12,33 @@ class FieldcoordinatorsController extends Controller
     }
 
     // Menampilkan daftar semua koordinator
+    // Ganti fungsi index() yang lama dengan ini
     public function index()
     {
-        $coordinatorModel     = $this->model('FieldCoordinator');
-        $data['coordinators'] = $coordinatorModel->getAll();
-        $data['title']        = 'Manajemen Koordinator';
+        $coordinatorModel = $this->model('FieldCoordinator');
 
-        // Hasilkan token SATU KALI di sini
-        $data['csrf_token'] = $this->generateCsrf();
+        // --- LOGIKA PAGINATION & PENCARIAN ---
+        $limit      = 15;
+        $page       = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $offset     = ($page - 1) * $limit;
+        $searchTerm = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
+
+        // Ambil total data untuk menghitung total halaman
+        $total_results = $coordinatorModel->getTotalCount($searchTerm);
+        $total_pages   = ceil($total_results / $limit);
+
+        // Ambil data yang sudah dipaginasi dan dicari
+        $coordinators = $coordinatorModel->getPaginated($limit, $offset, $searchTerm);
+
+        // Siapkan data untuk dikirim ke view
+        $data['coordinators'] = $coordinators;
+        $data['title']        = 'Manajemen Koordinator';
+        $data['csrf_token']   = $this->generateCsrf();
+
+        // Data untuk pagination dan pencarian
+        $data['page']        = $page;
+        $data['total_pages'] = $total_pages;
+        $data['searchTerm']  = $searchTerm;
 
         $this->view('layouts/header', $data);
         $this->view('field_coordinators/index', $data);

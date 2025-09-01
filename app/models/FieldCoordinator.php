@@ -70,4 +70,40 @@ class FieldCoordinator
         $stmt->execute(['term' => '%' . $term . '%']);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
+
+    // FUNGSI BARU: Menghitung total data (dengan filter pencarian)
+    public function getTotalCount($searchTerm = null)
+    {
+        $sql    = "SELECT COUNT(*) FROM {$this->table}";
+        $params = [];
+        if ($searchTerm) {
+            $sql .= " WHERE name LIKE :searchTerm";
+            $params[':searchTerm'] = '%' . $searchTerm . '%';
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
+    }
+
+    // FUNGSI BARU: Mengambil data dengan limit dan offset (dengan filter pencarian)
+    public function getPaginated($limit, $offset, $searchTerm = null)
+    {
+        $sql    = "SELECT * FROM {$this->table}";
+        $params = [];
+        if ($searchTerm) {
+            $sql .= " WHERE name LIKE :searchTerm";
+        }
+        $sql .= " ORDER BY name ASC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->db->prepare($sql);
+
+        if ($searchTerm) {
+            $stmt->bindValue(':searchTerm', '%' . $searchTerm . '%', PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
 }

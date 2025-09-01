@@ -99,44 +99,90 @@ class ParkingLocation
         return $stmt->execute(['id' => $id]);
     }
 
-    public function getTotalCount($coordinator_id = null)
+    public function getTotalCount($coordinator_id = null, $searchTerm = null)
     {
-        $sql    = "SELECT COUNT(*) FROM {$this->table}";
-        $params = [];
+        $sql        = "SELECT COUNT(*) FROM {$this->table} pl";
+        $params     = [];
+        $conditions = [];
+
         if ($coordinator_id) {
-            $sql .= " WHERE field_coordinator_id = :coordinator_id";
+            $conditions[]              = "pl.field_coordinator_id = :coordinator_id";
             $params[':coordinator_id'] = $coordinator_id;
         }
+        if ($searchTerm) {
+            $conditions[]          = "pl.parking_location LIKE :searchTerm";
+            $params[':searchTerm'] = '%' . $searchTerm . '%';
+        }
+
+        if (! empty($conditions)) {
+            $sql .= " WHERE " . implode(' AND ', $conditions);
+        }
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchColumn();
     }
 
     // FUNGSI BARU: Mengambil data dengan limit dan offset (dengan filter opsional)
-    public function getPaginated($limit, $offset, $coordinator_id = null)
+    public function getPaginated($limit, $offset, $coordinator_id = null, $searchTerm = null)
     {
         $sql = "SELECT pl.*, fc.name as coordinator_name
-                FROM {$this->table} pl
-                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id";
-        $params = [];
+            FROM {$this->table} pl
+            JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id";
+        $params     = [];
+        $conditions = [];
+
         if ($coordinator_id) {
-            $sql .= " WHERE pl.field_coordinator_id = :coordinator_id";
+            $conditions[]              = "pl.field_coordinator_id = :coordinator_id";
             $params[':coordinator_id'] = $coordinator_id;
         }
+        if ($searchTerm) {
+            $conditions[] = "pl.parking_location LIKE :searchTerm";
+        }
+
+        if (! empty($conditions)) {
+            $sql .= " WHERE " . implode(' AND ', $conditions);
+        }
+
         $sql .= " ORDER BY pl.created_at DESC LIMIT :limit OFFSET :offset";
 
         $stmt = $this->db->prepare($sql);
 
-        // Bind parameter filter jika ada
         if ($coordinator_id) {
-            $stmt->bindParam(':coordinator_id', $coordinator_id, PDO::PARAM_INT);
+            $stmt->bindValue(':coordinator_id', $coordinator_id, PDO::PARAM_INT);
+        }
+        if ($searchTerm) {
+            $stmt->bindValue(':searchTerm', '%' . $searchTerm . '%', PDO::PARAM_STR);
         }
 
-        // Bind parameter pagination (harus sebagai integer)
-        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 
         $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    public function getDetailsByCoordinatorId($coordinator_id)
+    {
+        $query = "SELECT
+                pl.id, pl.parking_location, pl.address,
+                fc.name as coordinator_name,
+                pd.daily_deposits,
+                pd.weekend_deposits,
+                pd.monthly_deposits
+              FROM
+                parking_locations pl
+              JOIN
+                field_coordinators fc ON pl.field_coordinator_id = fc.id
+              LEFT JOIN
+                parking_deposits pd ON pl.id = pd.parking_location_id
+              WHERE
+                pl.field_coordinator_id = :coordinator_id
+              ORDER BY
+                pl.parking_location ASC";
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute(['coordinator_id' => $coordinator_id]);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 

@@ -105,4 +105,16 @@ class ParkingDeposit
         return $stmt->fetchColumn();
     }
 
+    public function getTotalAllDeposits()
+    {
+        $query = "SELECT
+                SUM(daily_deposits) as total_daily,
+                SUM(weekend_deposits) as total_weekend,
+                SUM(monthly_deposits) as total_monthly
+              FROM {$this->table}";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_OBJ);
+    }
+
 }

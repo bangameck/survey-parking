@@ -1,13 +1,17 @@
 <div x-data="parkingLocationsComponent()" x-init="initTomSelect()" class="space-y-6">
 
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-lg shadow-md p-6 print:hidden">
         <form action="<?php echo BASE_URL ?>/parkinglocations" method="GET">
-            <h3 class="font-semibold text-lg text-gray-800 mb-4">Filter Lokasi</h3>
-            <div class="flex flex-col md:flex-row md:items-end gap-4">
-                <div class="flex-grow">
-                    <label for="coordinator_filter" class="block text-sm font-medium text-gray-700 mb-1">Pilih Koordinator</label>
-                    <select name="coordinator_id" id="coordinator_filter" class="tom-select-class w-full">
-                        <option value="">Tampilkan Semua Lokasi</option>
+            <h3 class="font-semibold text-lg text-gray-800 mb-4">Filter & Pencarian</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="search_term" class="block text-sm font-medium text-gray-700 mb-1">Cari Nama Lokasi</label>
+                    <input type="text" name="q" id="search_term" value="<?php echo htmlspecialchars($searchTerm ?? '') ?>" placeholder="Ketik nama lokasi..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="coordinator_filter" class="block text-sm font-medium text-gray-700 mb-1">Filter Koordinator</label>
+                    <select id="coordinator_filter" name="coordinator_id">
+                        <option value="">Tampilkan Semua</option>
                         <?php foreach ($coordinators as $coord): ?>
                             <option value="<?php echo $coord->id ?>"<?php echo(isset($selected_coordinator) && $selected_coordinator == $coord->id) ? 'selected' : '' ?>>
                                 <?php echo htmlspecialchars($coord->name) ?>
@@ -15,19 +19,19 @@
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="flex gap-2 flex-shrink-0">
-                    <button type="submit" class="w-full md:w-auto px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
-                        <span>Filter</span>
-                    </button>
-                    <a href="<?php echo BASE_URL ?>/parkinglocations" class="w-full md:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-center">Reset</a>
-                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <span>Cari</span>
+                </button>
+                <a href="<?php echo BASE_URL ?>/parkinglocations" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-center">Reset</a>
             </div>
         </form>
     </div>
 
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4">
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4 print:hidden">
             <h3 class="font-semibold text-lg text-gray-800">Daftar Lokasi Parkir</h3>
             <?php if ($_SESSION['user_role'] === 'admin'): ?>
             <div class="flex gap-2">
@@ -58,16 +62,12 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php if (empty($locations)): ?>
                         <tr>
-                            <td colspan="4" class="text-center py-10 text-gray-500">
+                            <td colspan="5" class="text-center py-10 text-gray-500">
                                 Tidak ada data yang ditemukan.
                             </td>
                         </tr>
-                     <?php else: ?>
-<?php
-    // Menghitung nomor awal berdasarkan halaman saat ini
-    // Asumsi $limit per halaman adalah 15, sesuai controller
-    $nomor = ($page - 1) * 15 + 1;
-?>
+                    <?php else: ?>
+<?php $nomor = ($page - 1) * 15 + 1; ?>
 <?php foreach ($locations as $loc): ?>
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $nomor++ ?></td>
@@ -76,13 +76,13 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($loc->coordinator_name) ?></td>
                                 <?php if ($_SESSION['user_role'] === 'admin'): ?>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button @click="handleEditClick(<?php echo $loc->id ?>)" class="text-indigo-600 hover:text-indigo-900">Edit</button> |
+                                    <button @click="handleEditClick(<?php echo $loc->id ?>)" class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
                                     <form id="delete-form-<?php echo $loc->id ?>" action="<?php echo BASE_URL ?>/parkinglocations/destroy/<?php echo $loc->id ?>" method="POST" class="inline">
-    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
-    <button type="button" @click="confirmDelete('delete-form-<?php echo $loc->id ?>')" class="text-red-600 hover:text-red-900">
-        Hapus
-    </button>
-</form>
+                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
+                                        <button type="button" @click="confirmDelete('delete-form-<?php echo $loc->id ?>')" class="text-red-600 hover:text-red-900">
+                                            Hapus
+                                        </button>
+                                    </form>
                                 </td>
                                 <?php endif; ?>
                             </tr>
@@ -100,22 +100,32 @@
                 </div>
                 <ul class="flex items-center space-x-1">
                     <?php if ($page > 1): ?>
-                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">&laquo;</a></li>
+                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">&laquo; Prev</a></li>
                     <?php endif; ?>
 
-                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])) ?>" class="px-3 py-2 leading-tight border rounded-md<?php echo($i == $page) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-blue-100 hover:text-blue-700' ?>"><?php echo $i ?></a></li>
-                    <?php endfor; ?>
+                    <?php
+                        $range = 1;
+                        for ($i = 1; $i <= $total_pages; $i++):
+                            if ($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)):
+                        ?>
+		                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])) ?>" class="px-3 py-2 leading-tight border rounded-md<?php echo($i == $page) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-blue-100 hover:text-blue-700' ?>"><?php echo $i ?></a></li>
+		                    <?php
+                                elseif ($i == $page - $range - 1 || $i == $page + $range + 1):
+                            ?>
+                        <li><span class="px-3 py-2 text-gray-500">...</span></li>
+                    <?php
+                        endif;
+                        endfor;
+                    ?>
 
                     <?php if ($page < $total_pages): ?>
-                         <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">&raquo;</a></li>
+                         <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">Next &raquo;</a></li>
                     <?php endif; ?>
                 </ul>
             </nav>
         </div>
         <?php endif; ?>
     </div>
-
 
     <div x-show="showCreateModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40" @keydown.escape.window="showCreateModal = false">
         <div @click.away="showCreateModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 mx-4">
@@ -125,7 +135,7 @@
                 <div class="space-y-4">
                     <div>
                         <label for="create_coord" class="block text-sm font-medium text-gray-700">Koordinator</label>
-                        <select name="field_coordinator_id" id="create_coord" required class="tom-select-class mt-1 block w-full ...">
+                        <select name="field_coordinator_id" id="create_coord" required class="mt-1 block w-full">
                             <option value="">Pilih Koordinator...</option>
                             <?php foreach ($coordinators as $coord): ?>
                                 <option value="<?php echo $coord->id ?>"><?php echo htmlspecialchars($coord->name) ?></option>
@@ -134,11 +144,11 @@
                     </div>
                     <div>
                         <label for="create_loc" class="block text-sm font-medium text-gray-700">Nama Lokasi</label>
-                        <input type="text" name="parking_location" id="create_loc" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                        <input type="text" name="parking_location" id="create_loc" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
                     </div>
                     <div>
                         <label for="create_addr" class="block text-sm font-medium text-gray-700">Alamat</label>
-                        <textarea name="address" id="create_addr" rows="3" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
+                        <textarea name="address" id="create_addr" rows="3" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"></textarea>
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-6 pt-4 border-t">
@@ -157,7 +167,7 @@
                 <div class="space-y-4">
                     <div>
                         <label for="edit_coord" class="block text-sm font-medium text-gray-700">Koordinator</label>
-                        <select name="field_coordinator_id" id="edit_coord" required class="tom-select-class mt-1 block w-full ...">
+                        <select name="field_coordinator_id" id="edit_coord" required class="mt-1 block w-full">
                             <option value="">Pilih Koordinator...</option>
                             <?php foreach ($coordinators as $coord): ?>
                                 <option :selected="editData.field_coordinator_id ==<?php echo $coord->id ?>" value="<?php echo $coord->id ?>"><?php echo htmlspecialchars($coord->name) ?></option>
@@ -166,11 +176,11 @@
                     </div>
                     <div>
                         <label for="edit_loc" class="block text-sm font-medium text-gray-700">Nama Lokasi</label>
-                        <input type="text" name="parking_location" id="edit_loc" :value="editData.parking_location" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                        <input type="text" name="parking_location" id="edit_loc" :value="editData.parking_location" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
                     </div>
                     <div>
                         <label for="edit_addr" class="block text-sm font-medium text-gray-700">Alamat</label>
-                        <textarea name="address" id="edit_addr" rows="3" x-text="editData.address" required class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"></textarea>
+                        <textarea name="address" id="edit_addr" rows="3" x-text="editData.address" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"></textarea>
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 mt-6 pt-4 border-t">
@@ -188,8 +198,8 @@
                 <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
                 <div class="space-y-4">
                     <div>
-                        <label for="import_coord" class="block text-sm font-medium text-gray-700">Pilih Koordinator untuk Semua Lokasi di File Ini</label>
-                        <select name="field_coordinator_id" id="import_coord" required class="tom-select-class mt-1 block w-full ...">
+                        <label for="import_coord" class="block text-sm font-medium text-gray-700">Pilih Koordinator</label>
+                        <select name="field_coordinator_id" id="import_coord" required class="mt-1 block w-full">
                             <option value="">Pilih Koordinator...</option>
                             <?php foreach ($coordinators as $coord): ?>
                                 <option value="<?php echo $coord->id ?>"><?php echo htmlspecialchars($coord->name) ?></option>
@@ -215,46 +225,31 @@
 <script>
     function parkingLocationsComponent() {
         return {
-            // 1. DATA (State)
-            showCreateModal: false,
-            showEditModal: false,
-            showImportModal: false,
-            editData: {},
-            formAction: '',
-            tomSelectEditInstance: null,
-
-            // 2. METHODS (Fungsi-fungsi)
+            showCreateModal: false, showEditModal: false, showImportModal: false,
+            editData: {}, formAction: '', tomSelectEditInstance: null,
             initTomSelect() {
-                // Inisialisasi semua dropdown
-                new TomSelect('#coordinator_filter', { create: false, sortField: { field: "text", direction: "asc" } });
-                new TomSelect('#create_coord', { create: false, sortField: { field: "text", direction: "asc" } });
-                new TomSelect('#import_coord', { create: false, sortField: { field: "text", direction: "asc" } });
+                new TomSelect('#coordinator_filter',{ create: false, sortField: { field: "text", direction: "asc" } });
+                new TomSelect('#create_coord',{ create: false, sortField: { field: "text", direction: "asc" } });
+                new TomSelect('#import_coord',{ create: false, sortField: { field: "text", direction: "asc" } });
                 this.tomSelectEditInstance = new TomSelect('#edit_coord', { create: false, sortField: { field: "text", direction: "asc" } });
             },
-
             handleEditClick(locationId) {
-                fetch('<?php echo BASE_URL?>/parkinglocations/getParkingLocationJson/' + locationId)
+                fetch(`<?php echo BASE_URL ?>/parkinglocations/getParkingLocationJson/${locationId}`)
                     .then(res => res.json())
                     .then(data => {
-                        if (data.error) {
-                            alert(data.error);
-                            return;
-                        }
+                        if (data.error) { alert(data.error); return; }
                         this.editData = data;
-                        this.formAction = '<?php echo BASE_URL?>/parkinglocations/update/' + data.id;
-
+                        this.formAction = `<?php echo BASE_URL ?>/parkinglocations/update/${data.id}`;
                         if (this.tomSelectEditInstance) {
                             this.tomSelectEditInstance.setValue(data.field_coordinator_id, true);
                         }
-
                         this.showEditModal = true;
                     });
             },
-
             confirmDelete(formId) {
                 Swal.fire({
                     title: 'Apakah Anda yakin?',
-                    text: "Data lokasi parkir ini akan dihapus secara permanen!",
+                    text: "Data lokasi ini akan dihapus permanen!",
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
@@ -269,4 +264,7 @@
             }
         };
     }
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('parkingLocationsComponent', parkingLocationsComponent);
+    });
 </script>

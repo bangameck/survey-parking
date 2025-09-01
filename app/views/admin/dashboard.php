@@ -12,16 +12,23 @@
                     <p class="text-sm font-medium text-gray-500">Total Koordinator</p>
                     <p class="text-3xl font-bold text-gray-900 mt-1"><?php echo $total_coordinators ?? 0 ?></p>
                 </div>
-                <div class="bg-white rounded-lg shadow-md p-6 md:col-span-2">
+                <div class="bg-white rounded-lg shadow-md p-6">
                     <p class="text-sm font-medium text-gray-500">Lokasi Sudah Disurvey</p>
                     <p class="text-3xl font-bold text-gray-900 mt-1"><?php echo $total_surveyed_locations ?? 0 ?></p>
                     <?php
                         $percentage = ($total_locations > 0) ? ($total_surveyed_locations / $total_locations) * 100 : 0;
                     ?>
                     <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                        <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                   <?php echo round($percentage) ?>%"></div>
+                        <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo round($percentage) ?>%"></div>
                     </div>
                     <p class="text-xs text-right text-gray-500 mt-1"><?php echo round($percentage) ?>% Selesai</p>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <p class="text-sm font-medium text-gray-500">Total Estimasi Pendapatan</p>
+                    <p class="text-3xl font-bold text-green-600 mt-1">
+                        <?php echo 'Rp ' . number_format($grand_total_deposits ?? 0, 0, ',', '.') ?>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">Akumulasi dari semua data setoran yang diinput.</p>
                 </div>
             </div>
         </div>
@@ -141,44 +148,63 @@
     </div>
 
     <div x-show="showCoordinatorResultsModal" x-cloak @keydown.escape.window="showCoordinatorResultsModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-        <div @click.away="showCoordinatorResultsModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-             <div class="flex justify-between items-center border-b p-4 sticky top-0 bg-white z-10">
-                <div>
-                    <h3 class="text-xl font-semibold">Lokasi Parkir Milik Koordinator</h3>
-                    <p class="text-sm text-gray-600 font-bold" x-text="selectedCoordinatorName"></p>
-                </div>
-                <button @click="showCoordinatorResultsModal = false" class="text-gray-400 hover:text-gray-900">&times;</button>
+    <div @click.away="showCoordinatorResultsModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+         <div class="flex justify-between items-center border-b p-4 sticky top-0 bg-white z-10">
+            <div>
+                <h3 class="text-xl font-semibold">Detail Lokasi Koordinator</h3>
+                <p class="text-sm text-gray-600 font-bold" x-text="selectedCoordinatorName"></p>
             </div>
-            <div class="p-4">
-                <table class="min-w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <template x-for="location in coordinatorResults" :key="location.id">
-                            <tr>
-                                <td class="px-4 py-2 font-medium text-gray-900" x-text="location.parking_location"></td>
-                                <td class="px-4 py-2 text-sm text-gray-600" x-text="location.address"></td>
-                                <td class="px-4 py-2">
-                                    <button @click="handleDetailClick(location.id); showCoordinatorResultsModal = false" class="text-sm text-blue-600 hover:underline">Lihat Detail</button>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
+            <button @click="showCoordinatorResultsModal = false" class="text-gray-400 hover:text-gray-900">&times;</button>
+        </div>
+
+        <div class="p-4 bg-gray-50 border-b grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-sm text-gray-500">Total Titik Lokasi</p>
+                <p class="text-2xl font-bold" x-text="coordinatorResults.length"></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Total Estimasi Setoran Harian</p>
+                <p class="text-2xl font-bold" x-html="formatCurrency(totalSetoran.daily)"></p>
             </div>
         </div>
+
+        <div class="p-4 overflow-y-auto">
+            <table class="min-w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harian (Rp)</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weekend (Rp)</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bulanan (Rp)</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <template x-if="coordinatorResults.length === 0">
+                        <tr><td colspan="6" class="text-center text-gray-500 py-6">Tidak ada data lokasi untuk koordinator ini.</td></tr>
+                    </template>
+                    <template x-for="(location, index) in coordinatorResults" :key="location.id">
+                        <tr>
+                            <td class="px-2 py-2 text-sm text-gray-500" x-text="index + 1"></td>
+                            <td class="px-2 py-2 font-medium" x-text="location.parking_location"></td>
+                            <td class="px-2 py-2 text-sm text-gray-600" x-text="location.address"></td>
+                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.daily_deposits)"></td>
+                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.weekend_deposits)"></td>
+                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.monthly_deposits)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
     </div>
+</div>
 </div>
 
 <script>
     function dashboardComponent() {
         return {
-            // State untuk semua modal
+            // State untuk semua modal dan data terkait
             showDetailsModal: false,
             details: {},
             showStreetResultsModal: false,
@@ -187,6 +213,8 @@
             showCoordinatorResultsModal: false,
             coordinatorResults: [],
             selectedCoordinatorName: '',
+            totalSetoran: { daily: 0, weekend: 0, monthly: 0 },
+            isAdmin:                     <?php echo($_SESSION['user_role'] === 'admin') ? 'true' : 'false' ?>,
 
             // Fungsi yang dijalankan saat komponen dimuat
             init() {
@@ -208,13 +236,65 @@
                 });
 
                 // Inisialisasi TomSelect untuk pencarian NAMA LOKASI
-                let locationTomSelect = new TomSelect('#location_search', { valueField: 'id', labelField: 'text', searchField: 'text', load: (query, callback) => { if (query.length < 3) return callback(); fetch(`<?php echo BASE_URL ?>/parkinglocations/searchJson?q=${encodeURIComponent(query)}`).then(response => response.json()).then(json => callback(json)).catch(() => callback()); }, onChange: (value) => { if (!value) return; this.handleDetailClick(value); locationTomSelect.clear(); locationTomSelect.blur(); } });
+                let locationTomSelect = new TomSelect('#location_search', {
+                    valueField: 'id',
+                    labelField: 'text',
+                    searchField: 'text',
+                    load: (query, callback) => {
+                        if (query.length < 3) return callback();
+                        fetch(`<?php echo BASE_URL ?>/parkinglocations/searchJson?q=${encodeURIComponent(query)}`)
+                            .then(response => response.json()).then(json => callback(json)).catch(() => callback());
+                    },
+                    onChange: (value) => {
+                        if (!value) return;
+                        this.handleDetailClick(value);
+                        locationTomSelect.clear();
+                        locationTomSelect.blur();
+                    }
+                });
 
                 // Inisialisasi TomSelect untuk pencarian NAMA JALAN
-                let streetTomSelect = new TomSelect('#street_search', { valueField: 'id', labelField: 'text', searchField: 'text', load: (query, callback) => { if (query.length < 3) return callback(); fetch(`<?php echo BASE_URL ?>/parkinglocations/searchAddressJson?q=${encodeURIComponent(query)}`).then(response => response.json()).then(json => callback(json)).catch(() => callback()); }, onChange: (value) => { if (!value) return; this.selectedStreet = value; fetch(`<?php echo BASE_URL ?>/parkinglocations/getLocationsByAddressJson?address=${encodeURIComponent(value)}`).then(res => res.json()).then(data => { this.streetResults = data; this.showStreetResultsModal = true; streetTomSelect.clear(); streetTomSelect.blur(); }); } });
+                let streetTomSelect = new TomSelect('#street_search', {
+                    valueField: 'id',
+                    labelField: 'text',
+                    searchField: 'text',
+                    load: (query, callback) => {
+                        if (query.length < 3) return callback();
+                        fetch(`<?php echo BASE_URL ?>/parkinglocations/searchAddressJson?q=${encodeURIComponent(query)}`)
+                            .then(response => response.json()).then(json => callback(json)).catch(() => callback());
+                    },
+                    onChange: (value) => {
+                        if (!value) return;
+                        this.selectedStreet = value;
+                        fetch(`<?php echo BASE_URL ?>/parkinglocations/getLocationsByAddressJson?address=${encodeURIComponent(value)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                this.streetResults = data;
+                                this.showStreetResultsModal = true;
+                                streetTomSelect.clear();
+                                streetTomSelect.blur();
+                            });
+                    }
+                });
 
                 // Inisialisasi TomSelect untuk pencarian NAMA KOORDINATOR
-                let coordinatorTomSelect = new TomSelect('#coordinator_search', { valueField: 'id', labelField: 'text', searchField: 'text', load: (query, callback) => { if (query.length < 2) return callback(); fetch(`<?php echo BASE_URL ?>/parkinglocations/searchCoordinatorsJson?q=${encodeURIComponent(query)}`).then(response => response.json()).then(json => callback(json)).catch(() => callback()); }, onChange: (value) => { if (!value) return; this.selectedCoordinatorName = coordinatorTomSelect.options[value].text; fetch(`<?php echo BASE_URL ?>/parkinglocations/getLocationsByCoordinatorJson/${value}`).then(res => res.json()).then(data => { this.coordinatorResults = data; this.showCoordinatorResultsModal = true; coordinatorTomSelect.clear(); coordinatorTomSelect.blur(); }); } });
+                let coordinatorTomSelect = new TomSelect('#coordinator_search', {
+                    valueField: 'id',
+                    labelField: 'text',
+                    searchField: 'text',
+                    load: (query, callback) => {
+                        if (query.length < 2) return callback();
+                        fetch(`<?php echo BASE_URL ?>/parkinglocations/searchCoordinatorsJson?q=${encodeURIComponent(query)}`)
+                            .then(response => response.json()).then(json => callback(json)).catch(() => callback());
+                    },
+                    onChange: (value) => {
+                        if (!value) return;
+                        this.selectedCoordinatorName = coordinatorTomSelect.options[value].text;
+                        this.fetchCoordinatorLocations(value); // Panggil fungsi terpisah
+                        coordinatorTomSelect.clear();
+                        coordinatorTomSelect.blur();
+                    }
+                });
             },
 
             // Fungsi untuk mengambil dan menampilkan detail satu lokasi
@@ -227,10 +307,40 @@
                     });
             },
 
+            // Fungsi untuk mengambil data lokasi koordinator dan menghitung total
+            fetchCoordinatorLocations(coordinatorId) {
+                this.coordinatorResults = [];
+                this.showCoordinatorResultsModal = true;
+                this.totalSetoran = { daily: 0 }; // Reset total
+
+                fetch(`<?php echo BASE_URL ?>/parkinglocations/getLocationsByCoordinatorJson/${coordinatorId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        this.coordinatorResults = data;
+
+                        // Hitung total hanya jika admin
+                        if (this.isAdmin) {
+                            let totalDaily = 0;
+                            data.forEach(loc => {
+                                totalDaily += parseFloat(loc.daily_deposits) || 0;
+                            });
+                            this.totalSetoran.daily = totalDaily;
+                        }
+                    });
+            },
+
             // Fungsi helper untuk format mata uang Rupiah
             formatCurrency(value) {
-                if (value === null || isNaN(parseFloat(value))) return 'Rp 0';
-                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
+                const numberValue = parseFloat(value);
+                if (isNaN(numberValue)) {
+                    return '<span class="text-gray-400 italic">Belum Survey</span>';
+                }
+                const formattedValue = new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR',
+                    minimumFractionDigits: 0
+                }).format(numberValue);
+                return `<strong class="text-gray-900">${formattedValue}</strong>`;
             }
         }
     }

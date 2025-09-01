@@ -15,25 +15,26 @@ class ParkinglocationsController extends Controller
     }
 
     // Menampilkan halaman utama (daftar lokasi)
+    // Ganti fungsi index() yang lama dengan ini
     public function index()
     {
         $locationModel    = $this->model('ParkingLocation');
         $coordinatorModel = $this->model('FieldCoordinator');
 
-                      // --- LOGIKA PAGINATION & FILTER ---
-        $limit  = 15; // Jumlah data per halaman
+        $limit  = 15;
         $page   = isset($_GET['page']) ? (int) $_GET['page'] : 1;
         $offset = ($page - 1) * $limit;
 
-        // Ambil filter koordinator dari URL jika ada
+        // Ambil filter koordinator DAN kata kunci pencarian
         $selected_coordinator = isset($_GET['coordinator_id']) && ! empty($_GET['coordinator_id']) ? $_GET['coordinator_id'] : null;
+        $searchTerm           = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
 
-        // Ambil total data untuk menghitung total halaman
-        $total_results = $locationModel->getTotalCount($selected_coordinator);
+        // Hitung total data dengan filter dan pencarian
+        $total_results = $locationModel->getTotalCount($selected_coordinator, $searchTerm);
         $total_pages   = ceil($total_results / $limit);
 
-        // Ambil data yang sudah dipaginasi dan difilter
-        $locations = $locationModel->getPaginated($limit, $offset, $selected_coordinator);
+        // Ambil data yang sudah dipaginasi dan difilter/dicari
+        $locations = $locationModel->getPaginated($limit, $offset, $selected_coordinator, $searchTerm);
 
         // Siapkan data untuk dikirim ke view
         $data['locations']    = $locations;
@@ -41,10 +42,11 @@ class ParkinglocationsController extends Controller
         $data['title']        = 'Manajemen Lokasi Parkir';
         $data['csrf_token']   = $this->generateCsrf();
 
-        // Data untuk pagination
+        // Data untuk pagination dan filter
         $data['page']                 = $page;
         $data['total_pages']          = $total_pages;
         $data['selected_coordinator'] = $selected_coordinator;
+        $data['searchTerm']           = $searchTerm; // Kirim kata kunci pencarian ke view
 
         $this->view('layouts/header', $data);
         $this->view('parking_locations/index', $data);
@@ -297,6 +299,7 @@ class ParkinglocationsController extends Controller
     }
 
 // FUNGSI BARU: Endpoint JSON untuk mengambil semua lokasi milik satu koordinator
+    // Ganti fungsi getLocationsByCoordinatorJson() yang lama dengan ini
     public function getLocationsByCoordinatorJson($coordinator_id)
     {
         header('Content-Type: application/json');
@@ -307,8 +310,16 @@ class ParkinglocationsController extends Controller
         }
 
         $locationModel = $this->model('ParkingLocation');
-        // Kita gunakan lagi fungsi getPaginated dengan limit yang sangat besar
-        $results = $locationModel->getPaginated(1000, 0, $coordinator_id);
+        $results       = [];
+
+        // Cek role user. Jika admin, kirim data lengkap. Jika guest, kirim data terbatas.
+        if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
+            // Admin mendapat data lengkap dengan setoran (menggunakan fungsi yang sudah kita buat)
+            $results = $locationModel->getDetailsByCoordinatorId($coordinator_id);
+        } else {
+            // Guest hanya mendapat data lokasi dasar (tanpa setoran)
+            $results = $locationModel->getPaginated(1000, 0, $coordinator_id);
+        }
 
         echo json_encode($results);
         exit();
