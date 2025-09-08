@@ -88,15 +88,27 @@ class FieldCoordinator
     // FUNGSI BARU: Mengambil data dengan limit dan offset (dengan filter pencarian)
     public function getPaginated($limit, $offset, $searchTerm = null)
     {
-        $sql    = "SELECT * FROM {$this->table}";
-        $params = [];
+        // Query ini melakukan LEFT JOIN untuk menghitung lokasi dari tabel parking_locations
+        $sql = "SELECT
+                fc.id, fc.name, fc.created_at,
+                COUNT(pl.id) as location_count
+            FROM
+                {$this->table} fc
+            LEFT JOIN
+                parking_locations pl ON fc.id = pl.field_coordinator_id";
+
+        // Menambahkan kondisi pencarian jika ada
         if ($searchTerm) {
-            $sql .= " WHERE name LIKE :searchTerm";
+            $sql .= " WHERE fc.name LIKE :searchTerm";
         }
-        $sql .= " ORDER BY name ASC LIMIT :limit OFFSET :offset";
+
+        // GROUP BY sangat penting untuk memastikan COUNT() bekerja per koordinator
+        $sql .= " GROUP BY fc.id, fc.name, fc.created_at";
+        $sql .= " ORDER BY fc.name ASC LIMIT :limit OFFSET :offset";
 
         $stmt = $this->db->prepare($sql);
 
+        // Bind parameter jika ada
         if ($searchTerm) {
             $stmt->bindValue(':searchTerm', '%' . $searchTerm . '%', PDO::PARAM_STR);
         }

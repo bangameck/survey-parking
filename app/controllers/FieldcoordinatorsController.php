@@ -1,4 +1,6 @@
 <?php
+use Dompdf\Dompdf;
+
 class FieldcoordinatorsController extends Controller
 {
 
@@ -138,4 +140,47 @@ class FieldcoordinatorsController extends Controller
             $this->redirect('fieldcoordinators');
         }
     }
+
+    // METHOD BARU UNTUK EXPORT PDF
+    public function export_pdf()
+    {
+        // Pastikan hanya admin yang bisa akses
+        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
+            die('Akses ditolak.');
+        }
+
+        // Ambil kata kunci pencarian dari URL jika ada
+        $searchTerm = isset($_GET['q']) ? $_GET['q'] : null;
+
+        $coordinatorModel = $this->model('FieldCoordinator');
+
+        // Ambil SEMUA data yang cocok (bukan paginasi) dengan filter pencarian
+        $coordinators = $coordinatorModel->getPaginated(9999, 0, $searchTerm);
+
+        $data['coordinators'] = $coordinators;
+        $data['title']        = 'Laporan Koordinator Lapangan';
+
+        // Render view PDF ke dalam sebuah variabel string menggunakan output buffering
+        ob_start();
+        $this->view('field_coordinators/pdf_template', $data);
+        $html = ob_get_clean();
+
+        // Inisialisasi Dompdf
+        $dompdf = new Dompdf();
+        $dompdf->loadHtml($html);
+
+        // Atur ukuran kertas dan orientasi
+        $dompdf->setPaper('A4', 'portrait');
+
+        // Render HTML sebagai PDF
+        $dompdf->render();
+
+        // Output PDF yang dihasilkan ke browser untuk di-download atau ditampilkan
+        $fileName = "daftar-koordinator-" . date('Y-m-d') . ".pdf";
+        $dompdf->stream($fileName, ["Attachment" => false]); // false = tampilkan di browser, true = langsung download
+        exit();
+    }
+
+    // Ganti fungsi getPaginated() Anda dengan versi lengkap dan benar ini
+
 }

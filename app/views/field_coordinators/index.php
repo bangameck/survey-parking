@@ -18,12 +18,23 @@
 
     <!-- TABEL UTAMA DAN TOMBOL AKSI -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="flex justify-between items-center p-6">
-            <h3 class="font-semibold text-lg text-gray-800">Manajemen Koordinator Lapangan</h3>
-            <button @click="showCreateModal = true"
-                class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
-                + Tambah Baru
-            </button>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6">
+            <h3 class="font-semibold text-lg text-gray-800 mb-2 sm:mb-0">Manajemen Koordinator Lapangan</h3>
+            <div class="flex gap-2">
+                <a href="<?= BASE_URL ?>/fieldcoordinators/export_pdf?q=<?= htmlspecialchars($searchTerm ?? '') ?>"
+                    target="_blank"
+                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    <span>Export PDF</span>
+                </a>
+                <button @click="showCreateModal = true"
+                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                    + Tambah Baru
+                </button>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full">

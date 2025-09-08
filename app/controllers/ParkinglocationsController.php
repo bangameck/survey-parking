@@ -1,6 +1,7 @@
 <?php
 
 // Gunakan namespace dari PhpSpreadsheet
+use Dompdf\Dompdf;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ParkinglocationsController extends Controller
@@ -322,6 +323,54 @@ class ParkinglocationsController extends Controller
         }
 
         echo json_encode($results);
+        exit();
+    }
+
+    public function export_pdf()
+    {
+        // Pastikan hanya admin yang bisa akses
+        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
+            die('Akses ditolak.');
+        }
+
+        // Ambil filter dan kata kunci pencarian dari URL
+        $coordinator_id = isset($_GET['coordinator_id']) && ! empty($_GET['coordinator_id']) ? $_GET['coordinator_id'] : null;
+        $searchTerm     = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
+
+        $locationModel = $this->model('ParkingLocation');
+
+        // Ambil SEMUA data yang cocok (bukan paginasi) dengan filter yang aktif
+        $locations = $locationModel->getPaginated(9999, 0, $coordinator_id, $searchTerm);
+
+        $data['locations']  = $locations;
+        $data['title']      = 'Laporan Lokasi Parkir';
+        $data['searchTerm'] = $searchTerm;
+
+        // Ambil nama koordinator untuk ditampilkan di judul laporan
+        $data['coordinator_name'] = null;
+        if ($coordinator_id) {
+            $coordinatorModel         = $this->model('FieldCoordinator');
+            $coordinator              = $coordinatorModel->getById($coordinator_id);
+            $data['coordinator_name'] = $coordinator->name;
+        }
+
+        // Render view PDF ke dalam sebuah variabel string
+        ob_start();
+        $this->view('parking_locations/pdf_template', $data);
+        $html = ob_get_clean();
+
+        // Inisialisasi Dompdf
+        $dompdf = new Dompdf();
+        $dompdf->loadHtml($html);
+
+        // Atur ukuran kertas ke A4 Landscape (Lanskap) agar muat
+        $dompdf->setPaper('A4', 'landscape');
+
+        // Render HTML sebagai PDF
+        $dompdf->render();
+
+        $fileName = "laporan-lokasi-parkir-" . date('Y-m-d') . ".pdf";
+        $dompdf->stream($fileName, ["Attachment" => false]);
         exit();
     }
 }
