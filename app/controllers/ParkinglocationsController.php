@@ -361,10 +361,14 @@ class ParkinglocationsController extends Controller
 
         // Inisialisasi Dompdf
         $dompdf = new Dompdf();
+        $dompdf->set_option('author', 'Aplikasi Survey UPT Perparkiran');
+        $dompdf->add_info('Creator', 'https://survey.uptperparkiranpku.com');
         $dompdf->loadHtml($html);
 
-        // Atur ukuran kertas ke A4 Landscape (Lanskap) agar muat
-        $dompdf->setPaper('A4', 'landscape');
+        $customPaper = [0, 0, 595.28, 935.43];
+
+        // Terapkan ukuran F4 dengan orientasi portrait
+        $dompdf->setPaper($customPaper, 'landscape');
 
         // Render HTML sebagai PDF
         $dompdf->render();

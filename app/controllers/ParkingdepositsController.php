@@ -1,5 +1,7 @@
 <?php
 use Dompdf\Dompdf;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ParkingdepositsController extends Controller
 {
@@ -134,6 +136,8 @@ class ParkingdepositsController extends Controller
 
         // Inisialisasi Dompdf
         $dompdf = new Dompdf();
+        $dompdf->set_option('author', 'Aplikasi Survey UPT Perparkiran');
+        $dompdf->add_info('Creator', 'https://survey.uptperparkiranpku.com');
         $dompdf->loadHtml($html);
 
         // Definisikan ukuran F4 dalam points [kiri, atas, lebar, tinggi]
@@ -148,6 +152,142 @@ class ParkingdepositsController extends Controller
         // Output PDF yang dihasilkan ke browser
         // "Attachment" => false akan menampilkan PDF di browser, true akan langsung men-download
         $dompdf->stream("laporan-hasil-survey-harian-" . $data['coordinator_name'] . ".pdf", ["Attachment" => false]);
+        exit();
+    }
+
+    public function export_excel()
+    {
+        // Pastikan koordinator dipilih dan user adalah admin
+        if (! isset($_GET['coordinator_id']) || $_SESSION['user_role'] !== 'admin') {
+            die('Akses ditolak atau Koordinator belum dipilih.');
+        }
+
+        $coordinator_id = $_GET['coordinator_id'];
+
+        // Ambil semua data yang relevan
+        $coordinatorModel = $this->model('FieldCoordinator');
+        $locationModel    = $this->model('ParkingLocation');
+        $coordinator      = $coordinatorModel->getById($coordinator_id);
+        $locations        = $locationModel->getDetailsByCoordinatorId($coordinator_id);
+
+        if (! $coordinator) {
+            die('Koordinator tidak ditemukan.');
+        }
+
+        // ====================================================================
+        // PROSES PEMBUATAN EXCEL DENGAN STYLING
+        // ====================================================================
+
+        // 1. Buat Spreadsheet Baru
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        // --- 2. Konfigurasi Dasar & Judul ---
+        $sheet->setTitle('Laporan Setoran');
+
+        // Judul Utama Laporan
+        $sheet->mergeCells('A1:G1');
+        $sheet->setCellValue('A1', 'LAPORAN SURVEY POTENSI PENDAPATAN PARKIR');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Informasi Koordinator dan Tanggal
+        $sheet->setCellValue('A3', 'NAMA KOORDINATOR:');
+        $sheet->setCellValue('B3', $coordinator->name);
+        $sheet->getStyle('A3')->getFont()->setBold(true);
+
+        $sheet->setCellValue('F3', 'TANGGAL CETAK:');
+        $sheet->setCellValue('G3', date('d F Y'));
+        $sheet->getStyle('F3')->getFont()->setBold(true);
+
+        // --- 3. Menulis Header Tabel ---
+        $headers = ['NO', 'NAMA LOKASI', 'ALAMAT', 'HARIAN', 'SABTU/MINGGU', 'BULANAN', 'KETERANGAN'];
+        $sheet->fromArray($headers, null, 'A5');
+        $headerStyle = [
+            'font'      => ['bold' => true, 'color' => ['argb' => 'FF000000']],
+            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFD9E2F3']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ];
+        $sheet->getStyle('A5:G5')->applyFromArray($headerStyle);
+
+                           // --- 4. Menulis Data ke Setiap Baris ---
+        $row          = 6; // Mulai dari baris 6
+        $nomor        = 1;
+        $totalDaily   = 0;
+        $totalWeekend = 0;
+        $totalMonthly = 0;
+
+        foreach ($locations as $loc) {
+            $sheet->setCellValue('A' . $row, $nomor++);
+            $sheet->setCellValue('B' . $row, $loc->parking_location);
+            $sheet->setCellValue('C' . $row, $loc->address);
+            $sheet->setCellValue('D' . $row, $loc->daily_deposits ?? 0);
+            $sheet->setCellValue('E' . $row, $loc->weekend_deposits ?? 0);
+            $sheet->setCellValue('F' . $row, $loc->monthly_deposits ?? 0);
+            $sheet->setCellValue('G' . $row, $loc->information ?? '');
+
+            $totalDaily += $loc->daily_deposits ?? 0;
+            $totalWeekend += $loc->weekend_deposits ?? 0;
+            $totalMonthly += $loc->monthly_deposits ?? 0;
+
+            $row++;
+        }
+
+        // --- 5. Menulis Baris Total ---
+        $sheet->mergeCells('A' . $row . ':C' . $row);
+        $sheet->setCellValue('A' . $row, 'TOTAL');
+        $sheet->setCellValue('D' . $row, $totalDaily);
+        $sheet->setCellValue('E' . $row, $totalWeekend);
+        $sheet->setCellValue('F' . $row, $totalMonthly);
+
+        $totalStyle = [
+            'font'      => ['bold' => true],
+            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFFABF8F']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT],
+        ];
+        $sheet->getStyle('A' . $row . ':G' . $row)->applyFromArray($totalStyle);
+        // Khusus untuk total currency agar rata kanan
+        $sheet->getStyle('D' . $row . ':F' . $row)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+
+        // --- 6. Menerapkan Styling Global ---
+        $lastRow = $row;
+        // Format Angka/Mata Uang
+        $currencyFormat = '#,##0';
+        $sheet->getStyle('D6:F' . $lastRow)->getNumberFormat()->setFormatCode($currencyFormat);
+
+        // Alignment
+        $sheet->getStyle('A6:A' . $lastRow)->getAlignment()->setHorizontal('center');
+        $sheet->getStyle('D6:F' . $lastRow)->getAlignment()->setHorizontal('right');
+
+        // Mengatur Lebar Kolom
+        $sheet->getColumnDimension('A')->setWidth(5);
+        $sheet->getColumnDimension('B')->setWidth(40);
+        $sheet->getColumnDimension('C')->setWidth(50);
+        $sheet->getColumnDimension('D')->setWidth(15);
+        $sheet->getColumnDimension('E')->setWidth(15);
+        $sheet->getColumnDimension('F')->setWidth(15);
+        $sheet->getColumnDimension('G')->setWidth(40);
+
+        // Menambahkan Border ke seluruh tabel
+        $borderStyle = [
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color'       => ['argb' => 'FF000000'],
+                ],
+            ],
+        ];
+        $sheet->getStyle('A5:G' . $lastRow)->applyFromArray($borderStyle);
+
+        // --- 7. Mengirim File ke Browser ---
+        $fileName = "laporan-setoran-" . str_replace(' ', '-', $coordinator->name) . "-" . date('Y-m-d') . ".xlsx";
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $fileName . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
         exit();
     }
 }

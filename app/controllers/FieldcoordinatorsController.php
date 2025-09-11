@@ -167,10 +167,14 @@ class FieldcoordinatorsController extends Controller
 
         // Inisialisasi Dompdf
         $dompdf = new Dompdf();
+        $dompdf->set_option('author', 'Aplikasi Survey UPT Perparkiran');
+        $dompdf->add_info('Creator', 'https://survey.uptperparkiranpku.com');
         $dompdf->loadHtml($html);
 
-        // Atur ukuran kertas dan orientasi
-        $dompdf->setPaper('A4', 'portrait');
+        $customPaper = [0, 0, 595.28, 935.43];
+
+        // Terapkan ukuran F4 dengan orientasi portrait
+        $dompdf->setPaper($customPaper, 'portrait');
 
         // Render HTML sebagai PDF
         $dompdf->render();
