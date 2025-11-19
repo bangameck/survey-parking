@@ -40,150 +40,148 @@
         </form>
     </div>
 
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4 print:hidden">
-            <h3 class="font-semibold text-lg text-gray-800">Daftar Lokasi Parkir</h3>
-            <?php if ($_SESSION['user_role'] === 'admin'): ?>
-            <div class="flex gap-2 flex-wrap justify-end">
-                <?php
-                    // Siapkan parameter query yang bersih, hanya untuk filter
-                    $exportParams = [];
-                    if (! empty($searchTerm)) {
-                        $exportParams['q'] = $searchTerm;
-                    }
-                    if (! empty($selected_coordinator)) {
-                        $exportParams['coordinator_id'] = $selected_coordinator;
-                    }
-                    // Buat query string dari parameter yang bersih
-                    $exportQueryString = http_build_query($exportParams);
-                ?>
-                <a href="<?php echo BASE_URL ?>/parkinglocations/export_pdf?<?php echo $exportQueryString ?>"
-                    target="_blank"
-                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
-                    <span>Export PDF</span>
-                </a>
+    <form id="bulk-delete-form" action="<?php echo BASE_URL ?>/parkinglocations/destroyBatch" method="POST">
+        <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
+        <input type="hidden" name="q_hidden" value="<?php echo htmlspecialchars($searchTerm ?? '') ?>">
+        <input type="hidden" name="coordinator_id_hidden" value="<?php echo htmlspecialchars($selected_coordinator ?? '') ?>">
 
-                <button @click="showImportModal = true"
-                    class="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 transition-colors flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
-                    Import File
-                </button>
-                <button @click="showCreateModal = true"
-                    class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
-                    + Tambah Baru
-                </button>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4 print:hidden">
+                <h3 class="font-semibold text-lg text-gray-800">Daftar Lokasi Parkir</h3>
+                <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                <div class="flex gap-2 flex-wrap justify-end">
+                    <?php
+                        $exportParams = [];
+                        if (! empty($searchTerm)) {$exportParams['q'] = $searchTerm;}
+                        if (! empty($selected_coordinator)) {$exportParams['coordinator_id'] = $selected_coordinator;}
+                        $exportQueryString = http_build_query($exportParams);
+                    ?>
+                    <a href="<?php echo BASE_URL ?>/parkinglocations/export_pdf?<?php echo $exportQueryString ?>"
+                        target="_blank"
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <span>Export PDF</span>
+                    </a>
+                    <button @click="showImportModal = true" type="button"
+                        class="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Import File
+                    </button>
+                    <button @click="showCreateModal = true" type="button"
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                        + Tambah Baru
+                    </button>
+                    <button @click="confirmBulkDelete($event)" type="button"
+                        class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Hapus Terpilih
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                            <th class="px-6 py-3 text-left">
+                                <input type="checkbox" @click="toggleSelectAll($event)"
+                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            </th>
+                            <?php endif; ?>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alamat</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Koordinator</th>
+                            <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php if (empty($locations)): ?>
+                        <tr>
+                            <td colspan="<?php echo($_SESSION['user_role'] === 'admin') ? '7' : '5' ?>" class="text-center py-10 text-gray-500">
+                                Tidak ada data yang ditemukan.
+                            </td>
+                        </tr>
+                        <?php else: ?>
+                        <?php $nomor = ($page - 1) * 15 + 1; ?>
+                        <?php foreach ($locations as $loc): ?>
+                        <tr>
+                            <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <input type="checkbox" name="location_ids[]" value="<?php echo $loc->id ?>"
+                                    class="location-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            </td>
+                            <?php endif; ?>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $nomor++ ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?php echo htmlspecialchars($loc->parking_location) ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($loc->address) ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo htmlspecialchars($loc->coordinator_name) ?></td>
+                            <?php if ($_SESSION['user_role'] === 'admin'): ?>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button @click="handleEditClick(<?php echo $loc->id ?>)" type="button"
+                                    class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
+                                <form id="delete-form-<?php echo $loc->id ?>"
+                                    action="<?php echo BASE_URL ?>/parkinglocations/destroy/<?php echo $loc->id ?>"
+                                    method="POST" class="inline">
+                                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
+                                    <button type="button" @click="confirmDelete('delete-form-<?php echo $loc->id ?>')"
+                                        class="text-red-600 hover:text-red-900">
+                                        Hapus
+                                    </button>
+                                </form>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if ($total_pages > 1): ?>
+            <div class="p-6 border-t">
+                <nav class="flex items-center justify-between">
+                    <div class="text-sm text-gray-600 hidden sm:block">
+                        Halaman <span class="font-bold"><?php echo $page ?></span> dari <span
+                            class="font-bold"><?php echo $total_pages ?></span>
+                    </div>
+                    <ul class="flex items-center space-x-1">
+                        <?php if ($page > 1): ?>
+                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>"
+                                class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">&laquo;
+                                Prev</a></li>
+                        <?php endif; ?>
+                        <?php
+                            $range = 1;
+                            for ($i = 1; $i <= $total_pages; $i++):
+                                if ($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)):
+                            ?>
+	                                <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])) ?>"
+	                                        class="px-3 py-2 leading-tight border rounded-md<?php echo($i == $page) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-blue-100 hover:text-blue-700' ?>"><?php echo $i ?></a>
+	                                </li>
+	                                <?php
+                                        elseif ($i == $page - $range - 1 || $i == $page + $range + 1):
+                                    ?>
+                        <li><span class="px-3 py-2 text-gray-500">...</span></li>
+                        <?php
+                            endif;
+                            endfor;
+                        ?>
+                        <?php if ($page < $total_pages): ?>
+                        <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>"
+                                class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">Next
+                                &raquo;</a></li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
             </div>
             <?php endif; ?>
         </div>
-
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Lokasi</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Alamat</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Koordinator</th>
-                        <?php if ($_SESSION['user_role'] === 'admin'): ?>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi
-                        </th>
-                        <?php endif; ?>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <?php if (empty($locations)): ?>
-                    <tr>
-                        <td colspan="5" class="text-center py-10 text-gray-500">
-                            Tidak ada data yang ditemukan.
-                        </td>
-                    </tr>
-                    <?php else: ?>
-<?php $nomor = ($page - 1) * 15 + 1; ?>
-<?php foreach ($locations as $loc): ?>
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?php echo $nomor++ ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            <?php echo htmlspecialchars($loc->parking_location) ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo htmlspecialchars($loc->address) ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <?php echo htmlspecialchars($loc->coordinator_name) ?></td>
-                        <?php if ($_SESSION['user_role'] === 'admin'): ?>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button @click="handleEditClick(<?php echo $loc->id ?>)"
-                                class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
-                            <form id="delete-form-<?php echo $loc->id ?>"
-                                action="<?php echo BASE_URL ?>/parkinglocations/destroy/<?php echo $loc->id ?>"
-                                method="POST" class="inline">
-                                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
-                                <button type="button" @click="confirmDelete('delete-form-<?php echo $loc->id ?>')"
-                                    class="text-red-600 hover:text-red-900">
-                                    Hapus
-                                </button>
-                            </form>
-                        </td>
-                        <?php endif; ?>
-                    </tr>
-                    <?php endforeach; ?>
-<?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <?php if ($total_pages > 1): ?>
-        <div class="p-6 border-t">
-            <nav class="flex items-center justify-between">
-                <div class="text-sm text-gray-600 hidden sm:block">
-                    Halaman <span class="font-bold"><?php echo $page ?></span> dari <span
-                        class="font-bold"><?php echo $total_pages ?></span>
-                </div>
-                <ul class="flex items-center space-x-1">
-                    <?php if ($page > 1): ?>
-                    <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])) ?>"
-                            class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">&laquo;
-                            Prev</a></li>
-                    <?php endif; ?>
-
-                    <?php
-                        $range = 1;
-                        for ($i = 1; $i <= $total_pages; $i++):
-                            if ($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)):
-                        ?>
-			                    <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])) ?>"
-			                            class="px-3 py-2 leading-tight border rounded-md<?php echo($i == $page) ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-500 border-gray-300 hover:bg-blue-100 hover:text-blue-700' ?>"><?php echo $i ?></a>
-			                    </li>
-			                    <?php
-                                    elseif ($i == $page - $range - 1 || $i == $page + $range + 1):
-                                ?>
-                    <li><span class="px-3 py-2 text-gray-500">...</span></li>
-                    <?php
-                        endif;
-                        endfor;
-                    ?>
-
-                    <?php if ($page < $total_pages): ?>
-                    <li><a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])) ?>"
-                            class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-blue-100 hover:text-blue-700">Next
-                            &raquo;</a></li>
-                    <?php endif; ?>
-                </ul>
-            </nav>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <div x-show="showCreateModal" x-cloak
+    </form> <div x-show="showCreateModal" x-cloak
         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40"
         @keydown.escape.window="showCreateModal = false">
         <div @click.away="showCreateModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 mx-4">
@@ -312,43 +310,16 @@
             formAction: '',
             tomSelectEditInstance: null,
             initTomSelect() {
-                new TomSelect('#coordinator_filter', {
-                    create: false,
-                    sortField: {
-                        field: "text",
-                        direction: "asc"
-                    }
-                });
-                new TomSelect('#create_coord', {
-                    create: false,
-                    sortField: {
-                        field: "text",
-                        direction: "asc"
-                    }
-                });
-                new TomSelect('#import_coord', {
-                    create: false,
-                    sortField: {
-                        field: "text",
-                        direction: "asc"
-                    }
-                });
-                this.tomSelectEditInstance = new TomSelect('#edit_coord', {
-                    create: false,
-                    sortField: {
-                        field: "text",
-                        direction: "asc"
-                    }
-                });
+                new TomSelect('#coordinator_filter', { create: false, sortField: { field: "text", direction: "asc" } });
+                new TomSelect('#create_coord', { create: false, sortField: { field: "text", direction: "asc" } });
+                new TomSelect('#import_coord', { create: false, sortField: { field: "text", direction: "asc" } });
+                this.tomSelectEditInstance = new TomSelect('#edit_coord', { create: false, sortField: { field: "text", direction: "asc" } });
             },
             handleEditClick(locationId) {
                 fetch(`<?php echo BASE_URL ?>/parkinglocations/getParkingLocationJson/${locationId}`)
                     .then(res => res.json())
                     .then(data => {
-                        if (data.error) {
-                            alert(data.error);
-                            return;
-                        }
+                        if (data.error) { alert(data.error); return; }
                         this.editData = data;
                         this.formAction = `<?php echo BASE_URL ?>/parkinglocations/update/${data.id}`;
                         if (this.tomSelectEditInstance) {
@@ -370,6 +341,43 @@
                 }).then((result) => {
                     if (result.isConfirmed) {
                         document.getElementById(formId).submit();
+                    }
+                })
+            },
+            // FUNGSI BARU UNTUK SELECT ALL
+            toggleSelectAll(event) {
+                const checkboxes = document.querySelectorAll('.location-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = event.target.checked;
+                });
+            },
+            // FUNGSI BARU UNTUK KONFIRMASI HAPUS MASSAL
+            confirmBulkDelete(event) {
+                // Cek dulu apakah ada yang dipilih
+                const checkedBoxes = document.querySelectorAll('.location-checkbox:checked');
+                if (checkedBoxes.length === 0) {
+                    Swal.fire({
+                        title: 'Tidak Ada Data Terpilih',
+                        text: 'Silakan pilih setidaknya satu lokasi untuk dihapus.',
+                        icon: 'info',
+                        confirmButtonColor: '#3085d6',
+                    });
+                    return; // Hentikan fungsi jika tidak ada yang dipilih
+                }
+
+                // Jika ada yang dipilih, tampilkan konfirmasi
+                Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: `Anda akan menghapus ${checkedBoxes.length} lokasi parkir secara permanen!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Ya, hapus semua!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('bulk-delete-form').submit();
                     }
                 })
             }

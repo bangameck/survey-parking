@@ -222,4 +222,27 @@ class ParkingLocation
         $stmt->execute(['address' => $address]);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
+
+    // FUNGSI BARU: Untuk menghapus data secara massal
+    public function deleteBatch($ids)
+    {
+        if (empty($ids) || ! is_array($ids)) {
+            return false;
+        }
+
+        // Membuat placeholder tanda tanya (?) sejumlah ID yang akan dihapus
+        // Contoh: (?,?,?)
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        $query = "DELETE FROM {$this->table} WHERE id IN ($placeholders)";
+
+        try {
+            $stmt = $this->db->prepare($query);
+            // Jalankan query dengan array ID sebagai parameter
+            return $stmt->execute($ids);
+        } catch (PDOException $e) {
+            // Tangani error jika terjadi (opsional, tapi bagus untuk logging)
+            return false;
+        }
+    }
 }

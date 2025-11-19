@@ -377,4 +377,48 @@ class ParkinglocationsController extends Controller
         $dompdf->stream($fileName, ["Attachment" => false]);
         exit();
     }
+
+    // FUNGSI BARU: Menghapus data secara massal
+    public function destroyBatch()
+    {
+        // Pastikan hanya admin yang bisa menghapus dan requestnya adalah POST
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
+
+            // Verifikasi CSRF token
+            if (! isset($_POST['csrf_token']) || ! $this->verifyCsrf($_POST['csrf_token'])) {
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'CSRF token tidak valid.'];
+                $this->redirect('parkinglocations');
+                return;
+            }
+
+            // Ambil array ID dari form
+            $location_ids = $_POST['location_ids'] ?? [];
+
+            if (empty($location_ids)) {
+                $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Tidak ada lokasi yang dipilih untuk dihapus.'];
+                $this->redirect('parkinglocations');
+                return;
+            }
+
+            // Panggil model untuk menghapus secara batch
+            $locationModel = $this->model('ParkingLocation');
+            if ($locationModel->deleteBatch($location_ids)) {
+                $_SESSION['flash'] = ['type' => 'success', 'message' => count($location_ids) . ' lokasi parkir berhasil dihapus.'];
+            } else {
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus beberapa lokasi parkir.'];
+            }
+
+            // Ambil filter yang sedang aktif dari form untuk redirect
+            $q        = $_POST['q_hidden'] ?? '';
+            $coord_id = $_POST['coordinator_id_hidden'] ?? '';
+            $params   = http_build_query(['q' => $q, 'coordinator_id' => $coord_id]);
+
+            // Redirect kembali ke halaman index dengan filter yang sama
+            $this->redirect('parkinglocations?' . $params);
+
+        } else {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses tidak sah.'];
+            $this->redirect('parkinglocations');
+        }
+    }
 }
