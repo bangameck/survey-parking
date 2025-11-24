@@ -1,11 +1,8 @@
 <div x-data="dashboardComponent()" x-init="init()">
 
-    <form x-ref="pdfForm" action="<?php echo BASE_URL ?>/admin/export_pdf" method="POST" target="_blank" class="hidden">
-        <input type="hidden" name="chart_image" x-model="chartImageBase64">
-    </form>
-
     <div class="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
         <h2 class="text-3xl font-bold text-gray-800">Admin Dashboard</h2>
+
         <button @click="handleExportPDF()" type="button" class="px-5 py-2.5 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
             <span>Export Laporan PDF</span>
@@ -60,7 +57,7 @@
                 $percentage = ($total_locations > 0) ? ($total_surveyed_locations / $total_locations) * 100 : 0;
             ?>
             <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                                                                                                                                                               <?php echo round($percentage) ?>%"></div>
+                <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                                                                                     <?php echo round($percentage) ?>%"></div>
             </div>
             <p class="text-xs text-right text-gray-500 mt-1"><?php echo round($percentage) ?>% Selesai</p>
         </div>
@@ -103,8 +100,37 @@
         </div>
     </div>
 
+    <div x-show="isLoading" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-200 text-center">
 
-   <div x-show="showDetailsModal" x-cloak @keydown.escape.window="showDetailsModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div class="mb-6 relative flex justify-center">
+                <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center animate-pulse">
+                    <svg class="w-10 h-10 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Menyiapkan Dashboard PDF</h3>
+            <p class="text-gray-500 text-sm mb-6" x-text="statusMessage">Mohon tunggu sebentar...</p>
+
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-2 overflow-hidden">
+                <div class="bg-blue-600 h-4 rounded-full transition-all duration-300 ease-out relative"
+                     :style="`width: ${progress}%`">
+                     <div class="absolute top-0 left-0 bottom-0 right-0 bg-white opacity-20 w-full animate-pulse"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between text-xs font-semibold text-gray-600">
+                <span>0%</span>
+                <span x-text="Math.round(progress) + '%'"></span>
+                <span>100%</span>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showDetailsModal" x-cloak @keydown.escape.window="showDetailsModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
         <div @click.away="showDetailsModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b p-4 sticky top-0 bg-white z-10">
                 <h3 class="text-xl font-semibold text-gray-900" x-text="details.location ? details.location.parking_location : 'Memuat...'"></h3>
@@ -193,54 +219,55 @@
     </div>
 
     <div x-show="showCoordinatorResultsModal" x-cloak @keydown.escape.window="showCoordinatorResultsModal = false" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-    <div @click.away="showCoordinatorResultsModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-         <div class="flex justify-between items-center border-b p-4 sticky top-0 bg-white z-10">
-            <div>
-                <h3 class="text-xl font-semibold">Detail Lokasi Koordinator</h3>
-                <p class="text-sm text-gray-600 font-bold" x-text="selectedCoordinatorName"></p>
+        <div @click.away="showCoordinatorResultsModal = false" class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b p-4 sticky top-0 bg-white z-10">
+                <div>
+                    <h3 class="text-xl font-semibold">Detail Lokasi Koordinator</h3>
+                    <p class="text-sm text-gray-600 font-bold" x-text="selectedCoordinatorName"></p>
+                </div>
+                <button @click="showCoordinatorResultsModal = false" class="text-gray-400 hover:text-gray-900">&times;</button>
             </div>
-            <button @click="showCoordinatorResultsModal = false" class="text-gray-400 hover:text-gray-900">&times;</button>
-        </div>
 
-        <div class="p-4 bg-gray-50 border-b grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <p class="text-sm text-gray-500">Total Titik Lokasi</p>
-                <p class="text-2xl font-bold" x-text="coordinatorResults.length"></p>
+            <div class="p-4 bg-gray-50 border-b grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm text-gray-500">Total Titik Lokasi</p>
+                    <p class="text-2xl font-bold" x-text="coordinatorResults.length"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total Estimasi Setoran Harian</p>
+                    <p class="text-2xl font-bold" x-html="formatCurrency(totalSetoran.daily)"></p>
+                </div>
             </div>
-            <div>
-                <p class="text-sm text-gray-500">Total Estimasi Setoran Harian</p>
-                <p class="text-2xl font-bold" x-html="formatCurrency(totalSetoran.daily)"></p>
-            </div>
-        </div>
 
-        <div class="p-4 overflow-y-auto">
-            <table class="min-w-full">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harian (Rp)</th>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weekend (Rp)</th>
-                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bulanan (Rp)</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <template x-if="coordinatorResults.length === 0">
-                        <tr><td colspan="6" class="text-center text-gray-500 py-6">Tidak ada data lokasi untuk koordinator ini.</td></tr>
-                    </template>
-                    <template x-for="(location, index) in coordinatorResults" :key="location.id">
+            <div class="p-4 overflow-y-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <td class="px-2 py-2 text-sm text-gray-500" x-text="index + 1"></td>
-                            <td class="px-2 py-2 font-medium" x-text="location.parking_location"></td>
-                            <td class="px-2 py-2 text-sm text-gray-600" x-text="location.address"></td>
-                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.daily_deposits)"></td>
-                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.weekend_deposits)"></td>
-                            <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.monthly_deposits)"></td>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Alamat</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harian (Rp)</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weekend (Rp)</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bulanan (Rp)</th>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-if="coordinatorResults.length === 0">
+                            <tr><td colspan="6" class="text-center text-gray-500 py-6">Tidak ada data lokasi untuk koordinator ini.</td></tr>
+                        </template>
+                        <template x-for="(location, index) in coordinatorResults" :key="location.id">
+                            <tr>
+                                <td class="px-2 py-2 text-sm text-gray-500" x-text="index + 1"></td>
+                                <td class="px-2 py-2 font-medium" x-text="location.parking_location"></td>
+                                <td class="px-2 py-2 text-sm text-gray-600" x-text="location.address"></td>
+                                <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.daily_deposits)"></td>
+                                <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.weekend_deposits)"></td>
+                                <td class="px-2 py-2 text-sm" x-html="formatCurrency(location.monthly_deposits)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -257,8 +284,13 @@
             coordinatorResults: [],
             selectedCoordinatorName: '',
             totalSetoran: { daily: 0, weekend: 0, monthly: 0 },
-            isAdmin:                                                             <?php echo($_SESSION['user_role'] === 'admin') ? 'true' : 'false' ?>,
-            chartImageBase64: '',
+            isAdmin:                                         <?php echo($_SESSION['user_role'] === 'admin') ? 'true' : 'false' ?>,
+
+            // VARIABEL UNTUK LOADING & EXPORT
+            isLoading: false,
+            progress: 0,
+            statusMessage: '',
+            timer: null,
 
             init() {
                 const ctx = document.getElementById('surveyComparisonChart').getContext('2d');
@@ -269,8 +301,8 @@
                         datasets: [{
                             data: [<?php echo $chart_data['surveyed'] ?? 0 ?>,<?php echo $chart_data['not_surveyed'] ?? 0 ?>],
                             backgroundColor: [
-                                'rgb(34, 197, 94)',  // HIJAU (Sama seperti kartu)
-                                'rgb(229, 231, 235)' // Abu-abu
+                                'rgb(34, 197, 94)',
+                                'rgb(229, 231, 235)'
                             ],
                             hoverOffset: 4,
                             borderColor: 'rgb(255, 255, 255)',
@@ -290,7 +322,6 @@
                     }
                 });
 
-                // Inisialisasi TomSelect (Kode Anda tidak berubah)
                 let locationTomSelect = new TomSelect('#location_search', {
                     valueField: 'id',
                     labelField: 'text',
@@ -307,6 +338,7 @@
                         locationTomSelect.blur();
                     }
                 });
+
                 let streetTomSelect = new TomSelect('#street_search', {
                     valueField: 'id',
                     labelField: 'text',
@@ -329,6 +361,7 @@
                             });
                     }
                 });
+
                 let coordinatorTomSelect = new TomSelect('#coordinator_search', {
                     valueField: 'id',
                     labelField: 'text',
@@ -348,7 +381,74 @@
                 });
             },
 
-            // Semua fungsi lain (handleDetailClick, dll) tidak berubah
+            // Fungsi handleExportPDF TERBARU (AJAX)
+            handleExportPDF() {
+                this.isLoading = true;
+                this.progress = 0;
+                this.statusMessage = 'Mengambil data grafik...';
+
+                // Ambil gambar dari canvas
+                const canvas = document.getElementById('surveyComparisonChart');
+                const chartImage = canvas.toDataURL('image/png');
+
+                // Simulasi Progress Bar
+                this.timer = setInterval(() => {
+                    if (this.progress < 30) {
+                        this.progress += 2;
+                        this.statusMessage = 'Mengolah data statistik...';
+                    } else if (this.progress < 70) {
+                        this.progress += 1;
+                        this.statusMessage = 'Menyusun layout PDF...';
+                    } else if (this.progress < 90) {
+                        this.progress += 0.5;
+                        this.statusMessage = 'Finalisasi dokumen...';
+                    }
+                }, 100);
+
+                // Siapkan Form Data
+                const formData = new FormData();
+                formData.append('chart_image', chartImage);
+
+                // Kirim Request ke Server
+                fetch('<?php echo BASE_URL ?>/admin/export_pdf', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Selesai
+                    clearInterval(this.timer);
+                    this.progress = 100;
+                    this.statusMessage = 'Selesai! Mengunduh...';
+
+                    // Download File
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const date = new Date().toISOString().slice(0, 10);
+                    a.download = `Laporan_Dashboard_${date}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+
+                    // Tutup Modal
+                    setTimeout(() => {
+                        this.isLoading = false;
+                        this.progress = 0;
+                    }, 1500);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    clearInterval(this.timer);
+                    this.isLoading = false;
+                    alert('Gagal mengexport PDF. Silakan coba lagi.');
+                });
+            },
+
+            // Fungsi lain tetap sama
             handleDetailClick(locationId) {
                 fetch(`<?php echo BASE_URL ?>/parkinglocations/getLocationDetailsJson/${locationId}`)
                     .then(res => res.json())
@@ -385,13 +485,6 @@
                     minimumFractionDigits: 0
                 }).format(numberValue);
                 return `<strong class="text-gray-900">${formattedValue}</strong>`;
-            },
-            handleExportPDF() {
-                const canvas = document.getElementById('surveyComparisonChart');
-                this.chartImageBase64 = canvas.toDataURL('image/png');
-                this.$nextTick(() => {
-                    this.$refs.pdfForm.submit();
-                });
             }
         }
     }

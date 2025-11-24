@@ -24,15 +24,25 @@ class DatabaseHelper
 
     public function backup()
     {
-                                                                                       // ====================================================================
-                                                                                       // PENTING: Sesuaikan path ini dengan lokasi mysqldump.exe di Laragon Anda!
-                                                                                       // Cari di D:\laragon\bin\mysql\...\bin\mysqldump.exe
-                                                                                       // ====================================================================
-        $mysqldumpPath = 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysqldump.exe'; // CONTOH PATH, HARAP DISESUAIKAN
+        // ====================================================================
+        // DETEKSI SISTEM OPERASI (WINDOWS VS LINUX/HOSTING)
+        // ====================================================================
 
-        if (! file_exists($mysqldumpPath)) {
-            // Jika mysqldump tidak ditemukan, kembalikan pesan error yang jelas
-            return ['success' => false, 'message' => 'File mysqldump.exe tidak ditemukan di path yang ditentukan. Silakan periksa file DatabaseHelper.php dan sesuaikan path-nya. Path yang dicari: ' . $mysqldumpPath];
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            // --- SETTINGAN LOKAL (WINDOWS / LARAGON) ---
+            // Sesuaikan path ini jika versi MySQL Laragon Anda berbeda
+            $mysqldumpPath = 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysqldump.exe';
+
+            // Cek validitas path windows
+            if (! file_exists($mysqldumpPath)) {
+                return ['success' => false, 'message' => 'File mysqldump.exe tidak ditemukan di path Windows. Cek DatabaseHelper.php.'];
+            }
+
+        } else {
+            // --- SETTINGAN HOSTING (LINUX) ---
+            // Di hosting, biasanya 'mysqldump' sudah terdaftar di global path.
+            // Jika gagal, coba ganti menjadi '/usr/bin/mysqldump'
+            $mysqldumpPath = 'mysqldump';
         }
 
         // Buat nama file backup yang unik dengan tanggal dan waktu
@@ -40,27 +50,45 @@ class DatabaseHelper
         $filePath = $this->backupPath . '/' . $fileName;
 
         // Bangun perintah command line untuk mysqldump
-        // PENTING: tidak ada spasi antara -p dan password jika password ada
+        // Catatan: Pada Linux hosting, terkadang perlu menambahkan path absolut untuk password jika gagal
         $passwordArg = ! empty($this->dbPass) ? "-p\"{$this->dbPass}\"" : "";
-        $command     = "\"{$mysqldumpPath}\" -h {$this->dbHost} -u {$this->dbUser} {$passwordArg} {$this->dbName} > \"{$filePath}\"";
 
-        // Jalankan perintah untuk membuat file backup
+        // Perintah dasar
+        $command = "\"{$mysqldumpPath}\" -h {$this->dbHost} -u {$this->dbUser} {$passwordArg} {$this->dbName} > \"{$filePath}\"";
+
+        // Khusus Linux Hosting: Tambahkan 2>&1 untuk menangkap error output jika debug diperlukan
+        if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+            // Opsional: Tambahkan flag --no-tablespaces jika user hosting tidak punya akses process
+            // $command = "mysqldump --no-tablespaces -h {$this->dbHost} -u {$this->dbUser} {$passwordArg} {$this->dbName} > \"{$filePath}\"";
+        }
+
+        // Jalankan perintah
         exec($command, $output, $returnVar);
 
-        // Cek apakah perintah berhasil dan file telah dibuat
-        if ($returnVar === 0 && file_exists($filePath)) {
+        // Cek apakah perintah berhasil dan file telah dibuat (Ukuran file > 0)
+        if ($returnVar === 0 && file_exists($filePath) && filesize($filePath) > 0) {
 
-            // FITUR KOMPATIBILITAS HOSTING:
-            // Baca seluruh isi file backup yang baru dibuat
+            // FITUR KOMPATIBILITAS:
             $fileContents = file_get_contents($filePath);
-            // Ganti collation modern (MySQL 8) dengan yang lebih kompatibel (MySQL 5.7 / MariaDB)
+            // Ganti collation modern (MySQL 8) dengan yang lebih kompatibel
             $fileContents = str_replace('utf8mb4_0900_ai_ci', 'utf8mb4_unicode_ci', $fileContents);
-            // Tulis kembali perubahan ke file
             file_put_contents($filePath, $fileContents);
 
             return ['success' => true, 'filePath' => $filePath, 'fileName' => $fileName];
         } else {
-            return ['success' => false, 'message' => 'Gagal membuat file backup. Cek konfigurasi, path mysqldump, atau izin folder.', 'output' => $output];
+            // Jika gagal di hosting, seringkali karena fungsi exec() diblokir
+            $errorMsg = 'Gagal membuat backup.';
+
+            if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+                $disabled = explode(',', ini_get('disable_functions'));
+                if (in_array('exec', $disabled)) {
+                    $errorMsg .= ' Fungsi exec() dinonaktifkan oleh penyedia hosting Anda.';
+                } else {
+                    $errorMsg .= ' Pastikan user database memiliki izin LOCK TABLES atau gunakan --no-tablespaces.';
+                }
+            }
+
+            return ['success' => false, 'message' => $errorMsg, 'output' => $output];
         }
     }
 }

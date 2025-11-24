@@ -118,4 +118,18 @@ class FieldCoordinator
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
+
+    public function getAvailableForTakeover()
+    {
+        // Logic: Select semua koordinator, LEFT JOIN dengan tabel takeover
+        // Ambil yang id takeover-nya NULL (artinya tidak ada match)
+        $query = "SELECT fc.* FROM {$this->table} fc
+                  LEFT JOIN pks_takeovers pt ON fc.id = pt.field_coordinator_id
+                  WHERE pt.id IS NULL
+                  ORDER BY fc.name ASC";
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
 }

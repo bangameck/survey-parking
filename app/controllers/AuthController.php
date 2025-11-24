@@ -32,12 +32,15 @@ class AuthController extends Controller
                 $_SESSION['username']  = $user->username;
                 $_SESSION['user_role'] = $user->role;
                 $_SESSION['flash']     = ['type' => 'success', 'message' => 'Login berhasil!'];
+                $_SESSION['user_team'] = $user->team_name;
 
                 // LOGIKA REDIRECT BARU BERDASARKAN ROLE
                 if ($user->role === 'admin') {
                     $this->redirect('admin'); // Akan memanggil AdminController->index()
                 } elseif ($user->role === 'guest') {
                     $this->redirect('guest'); // Akan memanggil GuestController->index()
+                } elseif ($user->role === 'team') {
+                    $this->redirect('team'); // Akan memanggil GuestController->index()
                 } else {
                     // Fallback jika ada role lain yang tidak terdefinisi
                     $this->redirect('auth/login');

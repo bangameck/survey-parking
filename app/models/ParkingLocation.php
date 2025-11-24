@@ -245,4 +245,36 @@ class ParkingLocation
             return false;
         }
     }
+
+    public function getExportData($coordinator_id = null)
+    {
+        $sql = "SELECT
+                    pl.id,
+                    pl.parking_location,
+                    pl.address,
+                    fc.name as coordinator_name,
+                    pd.daily_deposits,
+                    pd.weekend_deposits,
+                    pd.monthly_deposits,
+                    pd.surveyor_1,
+                    pd.surveyor_2,
+                    pd.information,
+                    pd.created_at as survey_date
+                FROM {$this->table} pl
+                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
+                LEFT JOIN parking_deposits pd ON pl.id = pd.parking_location_id
+                WHERE 1=1";
+
+        $params = [];
+        if (! empty($coordinator_id)) {
+            $sql .= " AND pl.field_coordinator_id = :cid";
+            $params[':cid'] = $coordinator_id;
+        }
+
+        $sql .= " ORDER BY fc.name ASC, pl.parking_location ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
 }

@@ -9,7 +9,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "DejaVu Sans", "Helvetica Neue", Arial, sans-serif;
             margin: 0;
             padding: 25px;
-            background-color: #f9fafb; /* Latar belakang abu-abu muda */
+            background-color: #f9fafb;
             color: #1f2937;
             font-size: 14px;
         }
@@ -28,98 +28,111 @@
             margin-bottom: 30px;
         }
 
-        /* Layout Grid 2x2 untuk Statistik */
+        /* Layout Utama */
+        .main-layout {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 20px 0;
+        }
+        .stats-column {
+            width: 60%; /* Lebar kolom statistik */
+            vertical-align: top;
+        }
+        .chart-column {
+            width: 40%; /* Lebar kolom chart */
+            vertical-align: top;
+        }
+
+        /* Grid Statistik */
         .stats-grid {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 15px; /* Jarak antar 'card' */
+            border-spacing: 15px;
         }
         .stats-grid-cell {
             width: 50%;
             vertical-align: top;
         }
 
-        /* Ini adalah style untuk 'card' statistik PUTIH yang baru */
+        /* Style Card */
         .card {
             background-color: #ffffff;
-            border: 1px solid #e5e7eb; /* Border abu-abu tipis */
-            border-radius: 16px; /* Ini adalah rounded-2xl versi CSS */
-            padding: 25px;
-            height: 130px;
-            overflow: hidden; /* Mencegah konten keluar */
-            /* Efek shadow tidak didukung baik, jadi kita pakai border */
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 20px;
+            height: 110px; /* Tinggi sedikit dikurangi agar muat banyak */
+            overflow: hidden;
         }
 
-        /* Aksen warna "smooth" menggunakan border-top tebal */
+        /* Warna Border Atas */
         .card-blue { border-top: 5px solid #3b82f6; }
         .card-purple { border-top: 5px solid #8b5cf6; }
-        .card-green { border-top: 5px solid #22c55e; }
-        .card-green-dark { border-top: 5px solid #16a34a; } /* Warna lain untuk pendapatan */
+        .card-yellow { border-top: 5px solid #eab308; }
+        .card-green { border-top: 5px solid #22c55e; } /* Untuk semua pendapatan */
 
         .card-label {
-            font-size: 15px;
+            font-size: 13px;
             color: #6b7280;
-            margin: 0 0 10px 0;
+            margin: 0 0 8px 0;
+            font-weight: 500;
         }
         .card-value {
-            font-size: 34px;
+            font-size: 28px;
             font-weight: bold;
             color: #111827;
-            margin: 10px 0 0 0;
-            padding: 0;
+            margin: 0;
         }
         .card-value-money {
-            font-size: 30px; /* Lebih kecil agar pas */
+            font-size: 24px;
             font-weight: bold;
-            color: #16a34a; /* Hijau tua */
-            margin: 10px 0 0 0;
+            color: #16a34a; /* Hijau Text */
+            margin: 0;
         }
 
-        /* Progress Bar (untuk kartu Lokasi Disurvey) */
+        /* Progress Bar */
         .progress-bar-bg {
             width: 100%;
             background-color: #e5e7eb;
             border-radius: 5px;
-            height: 10px;
-            margin-top: 15px;
+            height: 8px;
+            margin-top: 10px;
         }
         .progress-bar-fg {
-            background-color: #22c55e; /* Warna hijau */
-            height: 10px;
+            background-color: #eab308; /* Kuning */
+            height: 8px;
             border-radius: 5px;
         }
         .progress-label {
-            font-size: 12px;
+            font-size: 11px;
             color: #6b7280;
             text-align: right;
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
-        /* Kartu Chart (juga putih dan rounded) */
+        /* Chart Card */
         .chart-card {
             background-color: #ffffff;
             border: 1px solid #e5e7eb;
             border-radius: 16px;
             padding: 25px;
-            margin-top: 15px;
             text-align: center;
         }
         .chart-image {
-            max-width: 450px;
+            max-width: 100%;
             height: auto;
-            margin: 0 auto;
+            margin: 10px auto;
         }
         .explanation {
-            margin-top: 25px;
+            margin-top: 20px;
             text-align: left;
-            font-size: 14px;
+            font-size: 13px;
             color: #374151;
             border-top: 1px solid #f3f4f6;
-            padding-top: 20px;
+            padding-top: 15px;
         }
         .explanation p, .explanation li {
-            margin-bottom: 10px;
-            line-height: 1.6;
+            margin-bottom: 8px;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -127,84 +140,93 @@
     <h1>Laporan Ringkasan Dashboard</h1>
     <p class="subtitle">Dibuat pada:                                     <?php echo date('d F Y, H:i'); ?> WIB</p>
 
-    <table class="stats-grid">
+    <table class="main-layout">
         <tr>
-            <td class="stats-grid-cell">
-                <table class="card card-blue">
-                    <tr><td>
-                        <p class="card-label">Total Lokasi Parkir</p>
-                        <p class="card-value"><?php echo number_format($total_locations ?? 0, 0, ',', '.') ?></p>
-                    </td></tr>
+            <td class="stats-column">
+                <table class="stats-grid">
+                    <tr>
+                        <td class="stats-grid-cell">
+                            <div class="card card-blue">
+                                <p class="card-label">Total Lokasi Parkir</p>
+                                <p class="card-value"><?php echo number_format($total_locations ?? 0, 0, ',', '.') ?></p>
+                            </div>
+                        </td>
+                        <td class="stats-grid-cell">
+                            <div class="card card-purple">
+                                <p class="card-label">Total Koordinator</p>
+                                <p class="card-value"><?php echo number_format($total_coordinators ?? 0, 0, ',', '.') ?></p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="stats-grid-cell">
+                            <div class="card card-yellow">
+                                <p class="card-label">Lokasi Disurvey</p>
+                                <p class="card-value"><?php echo number_format($total_surveyed_locations ?? 0, 0, ',', '.') ?></p>
+                                <?php
+                                    $percentage = ($total_locations > 0) ? ($total_surveyed_locations / $total_locations) * 100 : 0;
+                                ?>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fg" style="width:                                                                               <?php echo round($percentage) ?>%;"></div>
+                                </div>
+                                <p class="progress-label"><?php echo round($percentage) ?>% Selesai</p>
+                            </div>
+                        </td>
+                        <td class="stats-grid-cell">
+                            <div class="card card-green">
+                                <p class="card-label">Est. Pendapatan Harian</p>
+                                <p class="card-value-money">
+                                    <?php echo 'Rp ' . number_format($deposits['daily'] ?? 0, 0, ',', '.') ?>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="stats-grid-cell">
+                            <div class="card card-green">
+                                <p class="card-label">Est. Pendapatan Weekend</p>
+                                <p class="card-value-money">
+                                    <?php echo 'Rp ' . number_format($deposits['weekend'] ?? 0, 0, ',', '.') ?>
+                                </p>
+                            </div>
+                        </td>
+                        <td class="stats-grid-cell">
+                            <div class="card card-green">
+                                <p class="card-label">Est. Pendapatan Bulanan</p>
+                                <p class="card-value-money">
+                                    <?php echo 'Rp ' . number_format($deposits['monthly'] ?? 0, 0, ',', '.') ?>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
                 </table>
             </td>
-            <td class="stats-grid-cell">
-                <table class="card card-purple">
-                    <tr><td>
-                        <p class="card-label">Total Koordinator</p>
-                        <p class="card-value"><?php echo number_format($total_coordinators ?? 0, 0, ',', '.') ?></p>
-                    </td></tr>
-                </table>
-            </td>
-        </tr>
-        <tr>
-            <td class="stats-grid-cell">
-                <table class="card card-green">
-                    <tr><td>
-                        <p class="card-label">Lokasi Disurvey</p>
-                        <p class="card-value"><?php echo number_format($total_surveyed_locations ?? 0, 0, ',', '.') ?></p>
-                        <?php
-                            $percentage = ($total_locations > 0) ? ($total_surveyed_locations / $total_locations) * 100 : 0;
-                        ?>
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fg" style="width:                                                                       <?php echo round($percentage) ?>%;"></div>
-                        </div>
-                        <p class="progress-label"><?php echo round($percentage) ?>% Selesai</p>
-                    </td></tr>
-                </table>
-            </td>
-            <td class="stats-grid-cell">
-                <table class="card card-green-dark">
-                    <tr><td>
-                        <p class="card-label">Estimasi Pendapatan</p>
-                        <p class="card-value-money">
-                            <?php echo 'Rp ' . number_format($grand_total_deposits ?? 0, 0, ',', '.') ?>
+
+            <td class="chart-column">
+                <div class="chart-card">
+                    <h2 style="margin-top: 0; text-align: center; font-size: 18px;">Grafik Survey</h2>
+                    <img src="<?php echo $chart_image_base64; ?>" class="chart-image" alt="Grafik Perbandingan Survey">
+
+                    <div class="explanation">
+                        <p style="font-weight: bold; font-size: 14px;">Analisis Data:</p>
+                        <p>Rincian status survey lokasi parkir saat ini:</p>
+                        <ul>
+                            <li>
+                                <strong>Sudah Disurvey (Kuning):</strong>
+                                <?php echo number_format($chart_data['surveyed'] ?? 0, 0, ',', '.') ?> lokasi
+                            </li>
+                            <li>
+                                <strong>Belum Disurvey (Abu-abu):</strong>
+                                <?php echo number_format($chart_data['not_surveyed'] ?? 0, 0, ',', '.') ?> lokasi
+                            </li>
+                        </ul>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                            *Estimasi pendapatan dihitung berdasarkan data setoran yang telah diinput oleh surveyor.
                         </p>
-                    </td></tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-
-    <table class="stats-grid">
-        <tr>
-            <td colspan="2"> <table class="chart-card">
-                    <tr><td>
-                        <h2 style="margin-top: 0; text-align: center;">Perbandingan Survey</h2>
-                        <img src="<?php echo $chart_image_base64; ?>" class="chart-image" alt="Grafik Perbandingan Survey">
-
-                        <div class="explanation">
-                            <p style="font-weight: bold; font-size: 16px;">Penjelasan Grafik:</p>
-                            <p>
-                                Grafik ini memvisualisasikan proporsi lokasi yang telah disurvey dibandingkan dengan yang masih menunggu untuk disurvey.
-                            </p>
-                            <ul>
-                                <li>
-                                    <strong>Sudah Disurvey (Hijau):</strong>
-                                    <strong><?php echo number_format($chart_data['surveyed'] ?? 0, 0, ',', '.') ?></strong> lokasi
-                                    (<?php echo round($percentage) ?>%)
-                                </li>
-                                <li>
-                                    <strong>Belum Disurvey (Abu-abu):</strong>
-                                    <strong><?php echo number_format($chart_data['not_surveyed'] ?? 0, 0, ',', '.') ?></strong> lokasi
-                                    (<?php echo 100 - round($percentage) ?>%)
-                                </li>
-                            </ul>
-                            <p>
-                                Data ini sangat penting untuk melacak progres dan efektivitas tim surveyor di lapangan serta untuk memproyeksikan potensi pendapatan.
-                            </p>
-                        </div>
-                    </td></tr>
-                </table>
+                    </div>
+                </div>
             </td>
         </tr>
     </table>
