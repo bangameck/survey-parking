@@ -8,9 +8,12 @@ class ParkingdepositsController extends Controller
 
     public function __construct()
     {
-        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
+        // UPDATE: Izinkan Admin, Pimpinan, dan Bendahara
+        $allowedRoles = ['admin', 'pimpinan', 'bendahara'];
+
+        if (! isset($_SESSION['user_id']) || ! in_array($_SESSION['user_role'], $allowedRoles)) {
             $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses ditolak.'];
-            $this->redirect('admin');
+            $this->redirect('auth/login');
         }
     }
 
@@ -53,13 +56,19 @@ class ParkingdepositsController extends Controller
     // Menyimpan semua data dari form
     public function store()
     {
+        // PROTEKSI: Hanya Admin yang boleh Input/Simpan
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menginput data setoran.'];
+            $this->redirect('parkingdeposits?coordinator_id=' . ($_POST['coordinator_id'] ?? ''));
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (! $this->verifyCsrf($_POST['csrf_token'])) {
                 die('CSRF token validation failed.');
             }
 
             $documentPath = null;
-            // Proses file upload
             if (isset($_FILES['document_survey']) && $_FILES['document_survey']['error'] == 0) {
                 $targetDir = "uploads/surveys/";
                 if (! is_dir($targetDir)) {
@@ -68,7 +77,6 @@ class ParkingdepositsController extends Controller
                 $fileName   = uniqid() . '-' . basename($_FILES["document_survey"]["name"]);
                 $targetFile = $targetDir . $fileName;
 
-                // Hanya izinkan PDF
                 $fileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
                 if ($fileType != "pdf") {
                     $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya file PDF yang diizinkan.'];

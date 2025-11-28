@@ -1,72 +1,69 @@
 <?php
 use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class FieldcoordinatorsController extends Controller
 {
 
-    // Constructor untuk memastikan hanya admin yang bisa akses
     public function __construct()
     {
-        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses ditolak. Anda bukan Admin.'];
-            $this->redirect('parkinglocations'); // Redirect ke dashboard
+        // UPDATE: Izinkan Admin, Pimpinan, dan Bendahara mengakses halaman ini
+        $allowedRoles = ['admin', 'pimpinan', 'bendahara'];
+
+        if (! isset($_SESSION['user_id']) || ! in_array($_SESSION['user_role'], $allowedRoles)) {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses ditolak.'];
+            $this->redirect('auth/login');
         }
     }
 
-    // Menampilkan daftar semua koordinator
-    // Ganti fungsi index() yang lama dengan ini
     public function index()
     {
         $coordinatorModel = $this->model('FieldCoordinator');
 
-        // --- LOGIKA PAGINATION & PENCARIAN ---
-        $limit      = 15;
-        $page       = isset($_GET['page']) ? (int) $_GET['page'] : 1;
-        $offset     = ($page - 1) * $limit;
-        $searchTerm = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
+        $limit  = 15;
+        $page   = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $offset = ($page - 1) * $limit;
 
-        // Ambil total data untuk menghitung total halaman
-        $total_results = $coordinatorModel->getTotalCount($searchTerm);
+        // Tangkap Filter
+        $searchTerm = isset($_GET['q']) ? $_GET['q'] : null;
+        $zone       = isset($_GET['zone']) && ! empty($_GET['zone']) ? $_GET['zone'] : null;
+
+        // Pass filter ke model
+        $total_results = $coordinatorModel->getTotalCount($searchTerm, $zone);
         $total_pages   = ceil($total_results / $limit);
+        $coordinators  = $coordinatorModel->getPaginated($limit, $offset, $searchTerm, $zone);
 
-        // Ambil data yang sudah dipaginasi dan dicari
-        $coordinators = $coordinatorModel->getPaginated($limit, $offset, $searchTerm);
-
-        // Siapkan data untuk dikirim ke view
-        $data['coordinators'] = $coordinators;
-        $data['title']        = 'Manajemen Koordinator';
-        $data['csrf_token']   = $this->generateCsrf();
-
-        // Data untuk pagination dan pencarian
-        $data['page']        = $page;
-        $data['total_pages'] = $total_pages;
-        $data['searchTerm']  = $searchTerm;
+        $data = [
+            'coordinators' => $coordinators,
+            'title'        => 'Manajemen Koordinator',
+            'csrf_token'   => $this->generateCsrf(),
+            'page'         => $page,
+            'total_pages'  => $total_pages,
+            'searchTerm'   => $searchTerm,
+            'selectedZone' => $zone, // Kirim zona terpilih ke view
+        ];
 
         $this->view('layouts/header', $data);
         $this->view('field_coordinators/index', $data);
         $this->view('layouts/footer');
     }
 
-    // Menampilkan form untuk membuat koordinator baru
-    public function create()
-    {
-        $data['title']      = 'Tambah Koordinator Baru';
-        $data['csrf_token'] = $this->generateCsrf();
-
-        $this->view('layouts/header', $data);
-        $this->view('field_coordinators/create', $data);
-        $this->view('layouts/footer');
-    }
-
-    // Menyimpan data dari form 'create' ke database
     public function store()
     {
+        // UPDATE: Hanya Admin yang boleh Create
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menambah data.'];
+            $this->redirect('fieldcoordinators');
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (! $this->verifyCsrf($_POST['csrf_token'])) {
                 die('CSRF token validation failed.');
             }
 
             $coordinatorModel = $this->model('FieldCoordinator');
+
             if ($coordinatorModel->create($_POST)) {
                 $_SESSION['flash'] = ['type' => 'success', 'message' => 'Koordinator baru berhasil ditambahkan!'];
             } else {
@@ -78,39 +75,29 @@ class FieldcoordinatorsController extends Controller
 
     public function getCoordinatorJson($id)
     {
-        // Atur header agar browser tahu ini adalah JSON
+        // API ini aman dibaca oleh semua role yang diizinkan di construct
         header('Content-Type: application/json');
-
-        $coordinatorModel = $this->model('FieldCoordinator');
-        $coordinator      = $coordinatorModel->getById($id);
-
-        // Cek jika data ditemukan
-        if ($coordinator) {
-            echo json_encode($coordinator);
-        } else {
-            // Kirim response error jika tidak ditemukan
-            http_response_code(404);
-            echo json_encode(['error' => 'Koordinator tidak ditemukan']);
-        }
-        exit(); // Hentikan eksekusi setelah mengirim JSON
+        echo json_encode($this->model('FieldCoordinator')->getById($id));
+        exit;
     }
 
-    // Menampilkan form untuk mengedit koordinator
-    public function edit($id)
+    public function getDetailJson($id)
     {
-        $coordinatorModel    = $this->model('FieldCoordinator');
-        $data['coordinator'] = $coordinatorModel->getById($id);
-        $data['title']       = 'Edit Koordinator';
-        $data['csrf_token']  = $this->generateCsrf();
-
-        $this->view('layouts/header', $data);
-        $this->view('field_coordinators/edit', $data);
-        $this->view('layouts/footer');
+        // API ini aman dibaca oleh semua role yang diizinkan di construct
+        header('Content-Type: application/json');
+        echo json_encode($this->model('FieldCoordinator')->getDetailWithLocations($id));
+        exit;
     }
 
-    // Mengupdate data dari form 'edit' ke database
     public function update($id)
     {
+        // UPDATE: Hanya Admin yang boleh Edit
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh mengubah data.'];
+            $this->redirect('fieldcoordinators');
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (! $this->verifyCsrf($_POST['csrf_token'])) {
                 die('CSRF token validation failed.');
@@ -126,65 +113,90 @@ class FieldcoordinatorsController extends Controller
         }
     }
 
-    // Menghapus data koordinator
     public function destroy($id)
     {
+        // UPDATE: Hanya Admin yang boleh Hapus
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menghapus data.'];
+            $this->redirect('fieldcoordinators');
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            // Kita bisa menambahkan verifikasi CSRF di sini juga jika tombol delete ada di dalam form
             $coordinatorModel = $this->model('FieldCoordinator');
             if ($coordinatorModel->delete($id)) {
-                $_SESSION['flash'] = ['type' => 'success', 'message' => 'Koordinator berhasil dihapus!'];
+                $_SESSION['flash'] = ['type' => 'success', 'message' => 'Data berhasil dihapus!'];
             } else {
-                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus koordinator.'];
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus data.'];
             }
             $this->redirect('fieldcoordinators');
         }
     }
 
-    // METHOD BARU UNTUK EXPORT PDF
+    // EXPORT PDF
     public function export_pdf()
     {
-        // Pastikan hanya admin yang bisa akses
-        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-            die('Akses ditolak.');
-        }
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
 
-        // Ambil kata kunci pencarian dari URL jika ada
-        $searchTerm = isset($_GET['q']) ? $_GET['q'] : null;
+        $zone = isset($_GET['zone']) && ! empty($_GET['zone']) ? $_GET['zone'] : null;
 
         $coordinatorModel = $this->model('FieldCoordinator');
 
-        // Ambil SEMUA data yang cocok (bukan paginasi) dengan filter pencarian
-        $coordinators = $coordinatorModel->getPaginated(9999, 0, $searchTerm);
+        // Ambil data sesuai Zona
+        $rawData = $coordinatorModel->getAllWithLocations($zone);
 
-        $data['coordinators'] = $coordinators;
-        $data['title']        = 'Laporan Koordinator Lapangan';
+        $groupedData = [];
+        foreach ($rawData as $row) {
+            if (! isset($groupedData[$row->id])) {
+                $groupedData[$row->id] = [
+                    'name'         => $row->name,
+                    'nik'          => $row->nik ?? '-',          // Masukkan NIK
+                    'phone_number' => $row->phone_number ?? '-', // Masukkan HP
+                    'pks_expired'  => $row->pks_expired,
+                    'locations'    => [],
+                ];
+            }
 
-        // Render view PDF ke dalam sebuah variabel string menggunakan output buffering
+            if ($row->parking_location) {
+                $groupedData[$row->id]['locations'][] = [
+                    'location' => $row->parking_location,
+                    'address'  => $row->address,
+                    'zone'     => $row->zone,
+                ];
+            }
+        }
+
+        // Sesuaikan Judul
+        $title = 'Laporan Koordinator & Lokasi';
+        if ($zone) {
+            $title .= ' - ' . htmlspecialchars($zone);
+        } else {
+            $title .= ' - Semua Zona';
+        }
+
+        $data = [
+            'groupedData' => $groupedData,
+            'title'       => $title,
+            'app_url'     => BASE_URL . '/fieldcoordinators',
+            'date'        => date('d-M-Y H:i:s'),
+        ];
+
         ob_start();
         $this->view('field_coordinators/pdf_template', $data);
         $html = ob_get_clean();
 
-        // Inisialisasi Dompdf
-        $dompdf = new Dompdf();
-        $dompdf->set_option('author', 'Aplikasi Survey UPT Perparkiran');
-        $dompdf->add_info('Creator', 'https://survey.uptperparkiranpku.com');
+        $options = new Options();
+        $options->set('isPhpEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
-
-        $customPaper = [0, 0, 595.28, 935.43];
-
-        // Terapkan ukuran F4 dengan orientasi portrait
-        $dompdf->setPaper($customPaper, 'portrait');
-
-        // Render HTML sebagai PDF
+        $dompdf->setPaper('F4', 'portrait');
         $dompdf->render();
 
-        // Output PDF yang dihasilkan ke browser untuk di-download atau ditampilkan
-        $fileName = "daftar-koordinator-" . date('Y-m-d') . ".pdf";
-        $dompdf->stream($fileName, ["Attachment" => false]); // false = tampilkan di browser, true = langsung download
+        $filename = "Data_Koordinator_" . ($zone ? str_replace(' ', '_', $zone) : 'All') . "_" . date('Y-m-d') . ".pdf";
+        $dompdf->stream($filename, ["Attachment" => false]);
         exit();
     }
-
-    // Ganti fungsi getPaginated() Anda dengan versi lengkap dan benar ini
-
 }

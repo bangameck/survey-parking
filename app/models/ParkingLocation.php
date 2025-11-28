@@ -11,7 +11,6 @@ class ParkingLocation
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    // Mengambil semua data dengan JOIN ke tabel koordinator
     public function getAll()
     {
         $query = "SELECT pl.*, fc.name as coordinator_name
@@ -23,7 +22,6 @@ class ParkingLocation
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
-    // Mengambil satu data berdasarkan ID dengan JOIN
     public function getById($id)
     {
         $query = "SELECT pl.*, fc.name as coordinator_name
@@ -35,230 +33,102 @@ class ParkingLocation
         return $stmt->fetch(PDO::FETCH_OBJ);
     }
 
-    // Membuat satu data lokasi baru
     public function create($data)
     {
-        $query = "INSERT INTO {$this->table} (field_coordinator_id, address, parking_location)
-                  VALUES (:field_coordinator_id, :address, :parking_location)";
+        // UPDATE: Tambahkan kolom 'zone'
+        $query = "INSERT INTO {$this->table} (field_coordinator_id, address, parking_location, zone)
+                  VALUES (:field_coordinator_id, :address, :parking_location, :zone)";
         $stmt = $this->db->prepare($query);
-        return $stmt->execute([
-            'field_coordinator_id' => $data['field_coordinator_id'],
-            'address'              => $data['address'],
-            'parking_location'     => $data['parking_location'],
-        ]);
+
+        $stmt->bindValue(':field_coordinator_id', $data['field_coordinator_id']);
+        $stmt->bindValue(':address', $data['address']);
+        $stmt->bindValue(':parking_location', $data['parking_location']);
+        // Handle jika zone kosong
+        $zone = ! empty($data['zone']) ? $data['zone'] : null;
+        $stmt->bindValue(':zone', $zone);
+
+        return $stmt->execute();
     }
 
-    // FUNGSI BARU: Membuat banyak data sekaligus (untuk import) dengan Transaction
-    public function createBatch($locations)
-    {
-        $this->db->beginTransaction();
-        try {
-            $query = "INSERT INTO {$this->table} (field_coordinator_id, address, parking_location)
-                      VALUES (:field_coordinator_id, :address, :parking_location)";
-            $stmt = $this->db->prepare($query);
-
-            foreach ($locations as $loc) {
-                $stmt->execute([
-                    'field_coordinator_id' => $loc['field_coordinator_id'],
-                    'address'              => $loc['address'],
-                    'parking_location'     => $loc['parking_location'],
-                ]);
-            }
-
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            // Optional: Log error $e->getMessage();
-            return false;
-        }
-    }
-
-    // Mengupdate data lokasi
     public function update($id, $data)
     {
-        $query = "UPDATE {$this->table} SET
-                    field_coordinator_id = :field_coordinator_id,
-                    address = :address,
-                    parking_location = :parking_location
+        // UPDATE: Tambahkan kolom 'zone'
+        $query = "UPDATE {$this->table}
+                  SET field_coordinator_id = :field_coordinator_id,
+                      address = :address,
+                      parking_location = :parking_location,
+                      zone = :zone
                   WHERE id = :id";
         $stmt = $this->db->prepare($query);
-        return $stmt->execute([
-            'id'                   => $id,
-            'field_coordinator_id' => $data['field_coordinator_id'],
-            'address'              => $data['address'],
-            'parking_location'     => $data['parking_location'],
-        ]);
+
+        $stmt->bindValue(':field_coordinator_id', $data['field_coordinator_id']);
+        $stmt->bindValue(':address', $data['address']);
+        $stmt->bindValue(':parking_location', $data['parking_location']);
+
+        $zone = ! empty($data['zone']) ? $data['zone'] : null;
+        $stmt->bindValue(':zone', $zone);
+
+        $stmt->bindValue(':id', $id);
+
+        return $stmt->execute();
     }
 
-    // Menghapus data lokasi
     public function delete($id)
     {
         $query = "DELETE FROM {$this->table} WHERE id = :id";
         $stmt  = $this->db->prepare($query);
-        return $stmt->execute(['id' => $id]);
+        $stmt->execute(['id' => $id]);
+        return $stmt->rowCount();
     }
 
-    public function getTotalCount($coordinator_id = null, $searchTerm = null)
+    // FUNGSI BARU: Bulk Update Zona
+    public function updateBatch($ids, $zone)
     {
-        $sql        = "SELECT COUNT(*) FROM {$this->table} pl";
-        $params     = [];
-        $conditions = [];
-
-        if ($coordinator_id) {
-            $conditions[]              = "pl.field_coordinator_id = :coordinator_id";
-            $params[':coordinator_id'] = $coordinator_id;
-        }
-        if ($searchTerm) {
-            $conditions[]          = "pl.parking_location LIKE :searchTerm";
-            $params[':searchTerm'] = '%' . $searchTerm . '%';
+        if (empty($ids) || ! is_array($ids)) {
+            return false;
         }
 
-        if (! empty($conditions)) {
-            $sql .= " WHERE " . implode(' AND ', $conditions);
-        }
+        // Buat placeholder (?,?,?)
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchColumn();
+        // Update zone untuk semua ID yang dipilih
+        $query = "UPDATE {$this->table} SET zone = ? WHERE id IN ($placeholders)";
+
+        // Gabungkan parameter: [Zona, ID1, ID2, ID3...]
+        $params = array_merge([$zone], $ids);
+
+        try {
+            $stmt = $this->db->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            return false;
+        }
     }
 
-    // FUNGSI BARU: Mengambil data dengan limit dan offset (dengan filter opsional)
-    public function getPaginated($limit, $offset, $coordinator_id = null, $searchTerm = null)
-    {
-        $sql = "SELECT pl.*, fc.name as coordinator_name
-            FROM {$this->table} pl
-            JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id";
-        $params     = [];
-        $conditions = [];
-
-        if ($coordinator_id) {
-            $conditions[]              = "pl.field_coordinator_id = :coordinator_id";
-            $params[':coordinator_id'] = $coordinator_id;
-        }
-        if ($searchTerm) {
-            $conditions[] = "pl.parking_location LIKE :searchTerm";
-        }
-
-        if (! empty($conditions)) {
-            $sql .= " WHERE " . implode(' AND ', $conditions);
-        }
-
-        $sql .= " ORDER BY pl.created_at DESC LIMIT :limit OFFSET :offset";
-
-        $stmt = $this->db->prepare($sql);
-
-        if ($coordinator_id) {
-            $stmt->bindValue(':coordinator_id', $coordinator_id, PDO::PARAM_INT);
-        }
-        if ($searchTerm) {
-            $stmt->bindValue(':searchTerm', '%' . $searchTerm . '%', PDO::PARAM_STR);
-        }
-
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    public function getDetailsByCoordinatorId($coordinator_id)
-    {
-        $query = "SELECT
-                pl.id, pl.parking_location, pl.address,
-                fc.name as coordinator_name,
-                pd.daily_deposits,
-                pd.weekend_deposits,
-                pd.monthly_deposits
-              FROM
-                parking_locations pl
-              JOIN
-                field_coordinators fc ON pl.field_coordinator_id = fc.id
-              LEFT JOIN
-                parking_deposits pd ON pl.id = pd.parking_location_id
-              WHERE
-                pl.field_coordinator_id = :coordinator_id
-              ORDER BY
-                pl.parking_location ASC";
-
-        $stmt = $this->db->prepare($query);
-        $stmt->execute(['coordinator_id' => $coordinator_id]);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    public function searchByName($term)
-    {
-        $query = "SELECT id, parking_location as text
-              FROM {$this->table}
-              WHERE parking_location LIKE :term
-              LIMIT 10";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute(['term' => '%' . $term . '%']);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    public function searchAddress($term)
-    {
-        // Menggunakan DISTINCT untuk memastikan setiap alamat hanya muncul sekali
-        $query = "SELECT DISTINCT address as id, address as text
-              FROM {$this->table}
-              WHERE address LIKE :term
-              ORDER BY address ASC
-              LIMIT 10";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute(['term' => '%' . $term . '%']);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-// FUNGSI BARU: Mengambil semua lokasi yang cocok dengan alamat tertentu
-    public function getByAddress($address)
-    {
-        $query = "SELECT pl.*, fc.name as coordinator_name
-              FROM {$this->table} pl
-              JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
-              WHERE pl.address = :address
-              ORDER BY pl.parking_location ASC";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute(['address' => $address]);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    // FUNGSI BARU: Untuk menghapus data secara massal
     public function deleteBatch($ids)
     {
         if (empty($ids) || ! is_array($ids)) {
             return false;
         }
 
-        // Membuat placeholder tanda tanya (?) sejumlah ID yang akan dihapus
-        // Contoh: (?,?,?)
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-        $query = "DELETE FROM {$this->table} WHERE id IN ($placeholders)";
-
+        $query        = "DELETE FROM {$this->table} WHERE id IN ($placeholders)";
         try {
             $stmt = $this->db->prepare($query);
-            // Jalankan query dengan array ID sebagai parameter
             return $stmt->execute($ids);
         } catch (PDOException $e) {
-            // Tangani error jika terjadi (opsional, tapi bagus untuk logging)
             return false;
         }
     }
 
+    // UPDATE: Tambahkan 'zone' di Export
     public function getExportData($coordinator_id = null)
     {
         $sql = "SELECT
-                    pl.id,
-                    pl.parking_location,
-                    pl.address,
+                    pl.id, pl.parking_location, pl.address, pl.zone,
                     fc.name as coordinator_name,
-                    pd.daily_deposits,
-                    pd.weekend_deposits,
-                    pd.monthly_deposits,
-                    pd.surveyor_1,
-                    pd.surveyor_2,
-                    pd.information,
+                    pd.daily_deposits, pd.weekend_deposits, pd.monthly_deposits,
+                    pd.surveyor_1, pd.surveyor_2, pd.information,
                     pd.created_at as survey_date
                 FROM {$this->table} pl
                 JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
@@ -270,11 +140,112 @@ class ParkingLocation
             $sql .= " AND pl.field_coordinator_id = :cid";
             $params[':cid'] = $coordinator_id;
         }
-
         $sql .= " ORDER BY fc.name ASC, pl.parking_location ASC";
-
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    // Method pagination, total count, dll tetap sama tapi pastikan SELECT-nya update jika perlu
+    public function getTotalCount($selected_coordinator = null, $searchTerm = null)
+    {
+        $sql    = "SELECT COUNT(*) as total FROM {$this->table} pl WHERE 1=1";
+        $params = [];
+        if ($selected_coordinator) {
+            $sql .= " AND pl.field_coordinator_id = :coord_id";
+            $params[':coord_id'] = $selected_coordinator;
+        }
+        if ($searchTerm) {
+            $sql .= " AND (pl.parking_location LIKE :search OR pl.address LIKE :search)";
+            $params[':search'] = '%' . $searchTerm . '%';
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_OBJ)->total;
+    }
+
+    public function getPaginated($limit, $offset, $selected_coordinator = null, $searchTerm = null)
+    {
+        // UPDATE: Select 'zone'
+        $sql = "SELECT pl.id, pl.parking_location, pl.address, pl.zone, fc.name as coordinator_name
+                FROM {$this->table} pl
+                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
+                WHERE 1=1";
+
+        $params = [];
+        if ($selected_coordinator) {
+            $sql .= " AND pl.field_coordinator_id = :coord_id";
+            $params[':coord_id'] = $selected_coordinator;
+        }
+        if ($searchTerm) {
+            $sql .= " AND (pl.parking_location LIKE :search OR pl.address LIKE :search)";
+            $params[':search'] = '%' . $searchTerm . '%';
+        }
+
+        $sql .= " ORDER BY pl.created_at DESC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->db->prepare($sql);
+        if (! empty($params)) {
+            foreach ($params as $key => $val) {
+                $stmt->bindValue($key, $val);
+            }
+
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    // Method helper lain (searchByName, dll) tetap dipertahankan jika ada di file asli
+    public function searchByName($term)
+    {
+        $stmt = $this->db->prepare("SELECT id, parking_location as text FROM {$this->table} WHERE parking_location LIKE :term LIMIT 20");
+        $stmt->execute(['term' => "%$term%"]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+    public function searchAddress($term)
+    {
+        $stmt = $this->db->prepare("SELECT id, address as text FROM {$this->table} WHERE address LIKE :term LIMIT 20");
+        $stmt->execute(['term' => "%$term%"]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+    public function getByAddress($address)
+    {
+        $stmt = $this->db->prepare("SELECT pl.*, fc.name as coordinator_name FROM {$this->table} pl JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id WHERE pl.address = :address");
+        $stmt->execute(['address' => $address]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+    public function getDetailsByCoordinatorId($coordId)
+    {
+        $query = "SELECT pl.*, pd.daily_deposits, pd.weekend_deposits, pd.monthly_deposits
+                  FROM {$this->table} pl
+                  LEFT JOIN parking_deposits pd ON pl.id = pd.parking_location_id
+                  WHERE pl.field_coordinator_id = :id";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute(['id' => $coordId]);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+    // Support Import (createBatch) jika diperlukan di file asli
+    public function createBatch($data)
+    {
+        if (empty($data)) {
+            return false;
+        }
+
+        $query = "INSERT INTO {$this->table} (field_coordinator_id, parking_location, address, zone)
+                  VALUES (:fc, :pl, :addr, :zone)";
+        $stmt = $this->db->prepare($query);
+
+        foreach ($data as $row) {
+            $stmt->execute([
+                'fc'   => $row['field_coordinator_id'],
+                'pl'   => $row['parking_location'],
+                'addr' => $row['address'],
+                'zone' => ! empty($row['zone']) ? $row['zone'] : null, // Handle Zona
+            ]);
+        }
+        return true;
     }
 }

@@ -10,6 +10,10 @@ class PksTakeover
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
+    // ====================================================================
+    // 1. MANAJEMEN TAKEOVER (ASSIGN TIM)
+    // ====================================================================
+
     public function create($data)
     {
         $query = "INSERT INTO {$this->table} (field_coordinator_id, team_name, start_date) VALUES (:fc_id, :team, :date)";
@@ -21,19 +25,35 @@ class PksTakeover
         ]);
     }
 
-    // Ambil takeover berdasarkan nama tim (untuk dropdown user)
+    // Ambil daftar takeover milik satu tim spesifik (Untuk Dropdown Team Input)
     public function getByTeam($team_name)
     {
-        $query = "SELECT t.*, fc.name as coordinator_name
+        $query = "SELECT t.*, fc.name as coordinator_name, fc.pks_expired
                   FROM {$this->table} t
                   JOIN field_coordinators fc ON t.field_coordinator_id = fc.id
-                  WHERE t.team_name = :team";
+                  WHERE t.team_name = :team
+                  ORDER BY fc.name ASC";
         $stmt = $this->db->prepare($query);
         $stmt->execute(['team' => $team_name]);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
-    // Cek apakah lokasi sudah bayar bulanan di bulan ini
+    // Ambil SEMUA data takeover (Untuk Tabel Monitoring Admin)
+    public function getAllWithDetails()
+    {
+        $query = "SELECT t.*, fc.name as coordinator_name
+                  FROM {$this->table} t
+                  JOIN field_coordinators fc ON t.field_coordinator_id = fc.id
+                  ORDER BY fc.name ASC";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    // ====================================================================
+    // 2. VALIDASI & STATUS SETORAN
+    // ====================================================================
+
     public function checkMonthlyPayment($location_id, $month, $year)
     {
         $query = "SELECT * FROM takeover_deposits
@@ -46,7 +66,6 @@ class PksTakeover
         return $stmt->fetch(PDO::FETCH_OBJ);
     }
 
-    // Ambil data setoran yang sudah ada di tanggal tertentu (untuk edit/view)
     public function getExistingDeposit($location_id, $date)
     {
         $query = "SELECT * FROM takeover_deposits WHERE parking_location_id = :loc_id AND deposit_date = :date";
@@ -55,20 +74,226 @@ class PksTakeover
         return $stmt->fetch(PDO::FETCH_OBJ);
     }
 
-    public function getAllWithDetails()
+    // ====================================================================
+    // 3. LAPORAN OPERASIONAL (HARIAN & BULANAN)
+    // ====================================================================
+
+    public function getDailyReport($teamName, $date, $coordId = null)
     {
-        $query = "SELECT t.*, fc.name as coordinator_name
-                  FROM {$this->table} t
-                  JOIN field_coordinators fc ON t.field_coordinator_id = fc.id
-                  ORDER BY t.created_at DESC";
-        $stmt = $this->db->prepare($query);
-        $stmt->execute();
+        $sql = "SELECT
+                    pl.id, pl.parking_location, pl.address, pl.zone,
+                    fc.name as coordinator_name, fc.nik, fc.phone_number,
+
+                    -- Data Transaksi Harian
+                    td.amount, td.status, td.notes, td.deposit_date,
+
+                    -- Data Target Survey
+                    survey.daily_deposits, survey.weekend_deposits, survey.monthly_deposits,
+
+                    -- Subquery Cek Status Lunas
+                    (SELECT COUNT(*) FROM takeover_deposits td_month
+                     WHERE td_month.parking_location_id = pl.id
+                     AND td_month.status = 'bulanan'
+                     AND MONTH(td_month.deposit_date) = MONTH(:date1)
+                     AND YEAR(td_month.deposit_date) = YEAR(:date2)
+                    ) as is_paid_monthly,
+
+                    (SELECT COUNT(*) FROM takeover_deposits td_week
+                     WHERE td_week.parking_location_id = pl.id
+                     AND td_week.status = 'weekend'
+                     AND YEARWEEK(td_week.deposit_date, 1) = YEARWEEK(:date3, 1)
+                    ) as is_paid_weekly
+
+                FROM parking_locations pl
+                JOIN pks_takeovers pt ON pl.field_coordinator_id = pt.field_coordinator_id
+                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
+                LEFT JOIN parking_deposits survey ON pl.id = survey.parking_location_id
+                LEFT JOIN takeover_deposits td ON pl.id = td.parking_location_id
+                                              AND td.deposit_date = :date4
+                                              AND td.takeover_id = pt.id
+                WHERE 1=1";
+
+        $params = ['date1' => $date, 'date2' => $date, 'date3' => $date, 'date4' => $date];
+
+        if ($teamName) {
+            $sql .= " AND pt.team_name = :team";
+            $params['team'] = $teamName;
+        }
+
+        if ($coordId) {
+            $sql .= " AND pl.field_coordinator_id = :cid";
+            $params['cid'] = $coordId;
+        }
+
+        $sql .= " ORDER BY fc.name ASC, pl.address ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
+    public function getMonthlyReport($teamName, $month, $year, $coordId = null)
+    {
+        // Menggunakan MAX() pada kolom target survey untuk mengatasi ONLY_FULL_GROUP_BY
+        $sql = "SELECT
+                    pl.id, pl.parking_location, pl.address, pl.zone,
+                    fc.name as coordinator_name, fc.nik, fc.phone_number,
+
+                    COALESCE(SUM(td.amount), 0) as total_amount,
+                    COUNT(td.id) as total_trx,
+
+                    MAX(survey.daily_deposits) as daily_deposits,
+                    MAX(survey.weekend_deposits) as weekend_deposits,
+                    MAX(survey.monthly_deposits) as monthly_deposits
+
+                FROM parking_locations pl
+                JOIN pks_takeovers pt ON pl.field_coordinator_id = pt.field_coordinator_id
+                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
+                LEFT JOIN parking_deposits survey ON pl.id = survey.parking_location_id
+                LEFT JOIN takeover_deposits td ON pl.id = td.parking_location_id
+                                              AND MONTH(td.deposit_date) = :m
+                                              AND YEAR(td.deposit_date) = :y
+                                              AND td.takeover_id = pt.id
+                WHERE 1=1";
+
+        $params = ['m' => $month, 'y' => $year];
+
+        if ($teamName) {
+            $sql .= " AND pt.team_name = :team";
+            $params['team'] = $teamName;
+        }
+
+        if ($coordId) {
+            $sql .= " AND pl.field_coordinator_id = :cid";
+            $params['cid'] = $coordId;
+        }
+
+        $sql .= " GROUP BY pl.id ORDER BY fc.name ASC, pl.address ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    public function getMonthlyDepositsRaw($teamName, $month, $year, $coordId = null)
+    {
+        // 1. Ambil Daftar Lokasi
+        $sqlLoc = "SELECT pl.id, pl.parking_location, pl.address, pl.zone,
+                          fc.name as coordinator_name, fc.nik, fc.phone_number,
+                          pd.daily_deposits, pd.weekend_deposits, pd.monthly_deposits
+                   FROM parking_locations pl
+                   JOIN pks_takeovers pt ON pl.field_coordinator_id = pt.field_coordinator_id
+                   JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
+                   LEFT JOIN parking_deposits pd ON pl.id = pd.parking_location_id
+                   WHERE 1=1";
+
+        $paramsLoc = [];
+        if ($teamName) {
+            $sqlLoc .= " AND pt.team_name = :team";
+            $paramsLoc['team'] = $teamName;
+        }
+        if ($coordId) {
+            $sqlLoc .= " AND pl.field_coordinator_id = :cid";
+            $paramsLoc['cid'] = $coordId;
+        }
+        $sqlLoc .= " ORDER BY fc.name ASC, pl.address ASC";
+
+        $stmtLoc = $this->db->prepare($sqlLoc);
+        $stmtLoc->execute($paramsLoc);
+        $locations = $stmtLoc->fetchAll(PDO::FETCH_OBJ);
+
+        // 2. Ambil Transaksi (Raw Data)
+        $sqlTrx = "SELECT td.*, DAY(td.deposit_date) as day_num
+                   FROM takeover_deposits td
+                   JOIN pks_takeovers pt ON td.takeover_id = pt.id
+                   WHERE MONTH(td.deposit_date) = :m AND YEAR(td.deposit_date) = :y";
+
+        $paramsTrx = ['m' => $month, 'y' => $year];
+        if ($teamName) {
+            $sqlTrx .= " AND pt.team_name = :team";
+            $paramsTrx['team'] = $teamName;
+        }
+
+        $stmtTrx = $this->db->prepare($sqlTrx);
+        $stmtTrx->execute($paramsTrx);
+        $transactions = $stmtTrx->fetchAll(PDO::FETCH_OBJ);
+
+        // 3. Mapping Transaksi ke Lokasi
+        foreach ($locations as $loc) {
+            $loc->deposits = [];
+            foreach ($transactions as $trx) {
+                if ($trx->parking_location_id == $loc->id) {
+                    $loc->deposits[$trx->day_num] = $trx;
+                }
+            }
+        }
+        return $locations;
+    }
+
+    // ====================================================================
+    // 4. LAPORAN PENGELUARAN
+    // ====================================================================
+
+    public function getExpensesDaily($teamName, $date, $coordId = null)
+    {
+        $sql = "SELECT te.*, u.username, fc.name as coordinator_name
+                FROM takeover_expenses te
+                JOIN pks_takeovers pt ON te.takeover_id = pt.id
+                JOIN field_coordinators fc ON pt.field_coordinator_id = fc.id
+                JOIN users u ON te.user_id = u.id
+                WHERE te.expense_date = :date";
+
+        $params = ['date' => $date];
+
+        if ($teamName) {
+            $sql .= " AND pt.team_name = :team";
+            $params['team'] = $teamName;
+        }
+
+        if ($coordId) {
+            $sql .= " AND pt.field_coordinator_id = :cid";
+            $params['cid'] = $coordId;
+        }
+
+        $sql .= " ORDER BY fc.name ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    public function getExpensesMonthly($teamName, $month, $year, $coordId = null)
+    {
+        // Menampilkan detail pengeluaran (tanggal, deskripsi, jumlah)
+        $sql = "SELECT te.description, te.amount, te.expense_date, fc.name as coordinator_name
+                FROM takeover_expenses te
+                JOIN pks_takeovers pt ON te.takeover_id = pt.id
+                JOIN field_coordinators fc ON pt.field_coordinator_id = fc.id
+                WHERE MONTH(te.expense_date) = :m AND YEAR(te.expense_date) = :y";
+
+        $params = ['m' => $month, 'y' => $year];
+
+        if ($teamName) {
+            $sql .= " AND pt.team_name = :team";
+            $params['team'] = $teamName;
+        }
+
+        if ($coordId) {
+            $sql .= " AND pt.field_coordinator_id = :cid";
+            $params['cid'] = $coordId;
+        }
+
+        $sql .= " ORDER BY fc.name ASC, te.expense_date ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
+    }
+
+    // ====================================================================
+    // 5. STATISTIK DASHBOARD TIM
+    // ====================================================================
+
     public function getTeamDashboardStats($team_name)
     {
-        // 1. Ambil ID Takeover dan ID Koordinator milik tim ini
         $queryTakeover = "SELECT id, field_coordinator_id FROM {$this->table} WHERE team_name = :team";
         $stmt          = $this->db->prepare($queryTakeover);
         $stmt->execute(['team' => $team_name]);
@@ -87,47 +312,32 @@ class PksTakeover
 
         $takeoverIds = array_column($takeovers, 'id');
         $coordIds    = array_column($takeovers, 'field_coordinator_id');
+        $inTakeover  = implode(',', $takeoverIds);
+        $inCoord     = implode(',', $coordIds);
 
-        // String untuk IN clause SQL
-        $inTakeover = implode(',', $takeoverIds);
-        $inCoord    = implode(',', $coordIds);
-
-        // 2. Hitung Total Lokasi yang Dikelola
         $queryLoc       = "SELECT COUNT(*) as total FROM parking_locations WHERE field_coordinator_id IN ($inCoord)";
-        $stmtLoc        = $this->db->query($queryLoc);
-        $totalLocations = $stmtLoc->fetch(PDO::FETCH_OBJ)->total;
+        $totalLocations = $this->db->query($queryLoc)->fetch(PDO::FETCH_OBJ)->total;
 
-        // 3. Hitung Pendapatan HARI INI (Real)
         $today      = date('Y-m-d');
         $queryToday = "SELECT SUM(amount) as total FROM takeover_deposits
                        WHERE takeover_id IN ($inTakeover) AND deposit_date = '$today'";
-        $stmtToday   = $this->db->query($queryToday);
-        $todayIncome = $stmtToday->fetch(PDO::FETCH_OBJ)->total ?? 0;
+        $todayIncome = $this->db->query($queryToday)->fetch(PDO::FETCH_OBJ)->total ?? 0;
 
-        // 4. Hitung Target Survey Harian (Total semua lokasi di bawah tim ini)
-        // Kita asumsikan target harian = penjumlahan daily_deposits dari data survey
         $queryTarget = "SELECT SUM(pd.daily_deposits) as total_target
                         FROM parking_locations pl
                         JOIN parking_deposits pd ON pl.id = pd.parking_location_id
                         WHERE pl.field_coordinator_id IN ($inCoord)";
-        $stmtTarget  = $this->db->query($queryTarget);
-        $dailyTarget = $stmtTarget->fetch(PDO::FETCH_OBJ)->total_target ?? 0;
+        $dailyTarget = $this->db->query($queryTarget)->fetch(PDO::FETCH_OBJ)->total_target ?? 0;
 
-        // 5. Hitung Persentase Capaian Bulan Ini
-        // (Real Setoran Bulan Ini / (Target Harian * Hari Berjalan)) * 100
         $currentMonth   = date('m');
         $queryMonthReal = "SELECT SUM(amount) as total FROM takeover_deposits
                            WHERE takeover_id IN ($inTakeover) AND MONTH(deposit_date) = '$currentMonth'";
-        $stmtMonth = $this->db->query($queryMonthReal);
-        $monthReal = $stmtMonth->fetch(PDO::FETCH_OBJ)->total ?? 0;
+        $monthReal = $this->db->query($queryMonthReal)->fetch(PDO::FETCH_OBJ)->total ?? 0;
 
-        // Estimasi target sampai hari ini (sederhana)
         $daysPassed            = date('d');
         $monthTargetProjection = $dailyTarget * $daysPassed;
+        $achievement           = ($monthTargetProjection > 0) ? ($monthReal / $monthTargetProjection) * 100 : 0;
 
-        $achievement = ($monthTargetProjection > 0) ? ($monthReal / $monthTargetProjection) * 100 : 0;
-
-        // 6. Data Chart (7 Hari Terakhir)
         $chartLabels = [];
         $chartTarget = [];
         $chartReal   = [];
@@ -135,16 +345,12 @@ class PksTakeover
         for ($i = 6; $i >= 0; $i--) {
             $dateLoop      = date('Y-m-d', strtotime("-$i days"));
             $chartLabels[] = date('d M', strtotime($dateLoop));
-
-            // Target Harian (Flat dari data survey)
             $chartTarget[] = $dailyTarget;
 
-            // Realisasi Harian
             $queryDailyReal = "SELECT SUM(amount) as total FROM takeover_deposits
                                WHERE takeover_id IN ($inTakeover) AND deposit_date = '$dateLoop'";
-            $stmtDailyReal = $this->db->query($queryDailyReal);
-            $real          = $stmtDailyReal->fetch(PDO::FETCH_OBJ)->total ?? 0;
-            $chartReal[]   = $real;
+            $real        = $this->db->query($queryDailyReal)->fetch(PDO::FETCH_OBJ)->total ?? 0;
+            $chartReal[] = $real;
         }
 
         return [
@@ -155,123 +361,5 @@ class PksTakeover
             'chart_target'        => $chartTarget,
             'chart_real'          => $chartReal,
         ];
-    }
-
-    public function getTeamDepositHistory($userId, $startDate, $endDate)
-    {
-        $query = "SELECT td.*, pl.parking_location, pl.address, pt.team_name, fc.name as coordinator_name
-                  FROM takeover_deposits td
-                  JOIN parking_locations pl ON td.parking_location_id = pl.id
-                  JOIN pks_takeovers pt ON td.takeover_id = pt.id
-                  JOIN field_coordinators fc ON pt.field_coordinator_id = fc.id
-                  WHERE td.user_id = :uid
-                  AND td.deposit_date BETWEEN :start AND :end
-                  ORDER BY td.deposit_date DESC, td.created_at DESC";
-
-        $stmt = $this->db->prepare($query);
-        $stmt->execute([
-            'uid'   => $userId,
-            'start' => $startDate,
-            'end'   => $endDate,
-        ]);
-
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    public function getDailyReport($teamName, $date, $coordId = null)
-    {
-        $sql = "SELECT
-                    pl.id, pl.parking_location, pl.address,
-                    fc.name as coordinator_name,
-
-                    -- Data Setoran HARI INI (Specific Date)
-                    td.amount, td.status, td.notes, td.deposit_date,
-
-                    -- Ambil Data Target Survey
-                    survey.daily_deposits, survey.weekend_deposits, survey.monthly_deposits,
-
-                    -- CEK LOGIKA PEMBAYARAN (Subqueries)
-                    (SELECT COUNT(*) FROM takeover_deposits td_month
-                     WHERE td_month.parking_location_id = pl.id
-                     AND td_month.takeover_id = pt.id
-                     AND td_month.status = 'bulanan'
-                     AND MONTH(td_month.deposit_date) = MONTH(:date1)
-                     AND YEAR(td_month.deposit_date) = YEAR(:date2)
-                    ) as is_paid_monthly,
-
-                    (SELECT COUNT(*) FROM takeover_deposits td_week
-                     WHERE td_week.parking_location_id = pl.id
-                     AND td_week.takeover_id = pt.id
-                     AND td_week.status = 'weekend'
-                     AND YEARWEEK(td_week.deposit_date, 1) = YEARWEEK(:date3, 1)
-                    ) as is_paid_weekly
-
-                FROM parking_locations pl
-                JOIN pks_takeovers pt ON pl.field_coordinator_id = pt.field_coordinator_id
-                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
-                LEFT JOIN parking_deposits survey ON pl.id = survey.parking_location_id
-                LEFT JOIN takeover_deposits td ON pl.id = td.parking_location_id
-                                              AND td.deposit_date = :date4
-                                              AND td.takeover_id = pt.id
-                WHERE pt.team_name = :team";
-
-        // Parameter date kita bind beberapa kali karena dipakai di subquery
-        $params = [
-            'team'  => $teamName,
-            'date1' => $date,
-            'date2' => $date,
-            'date3' => $date,
-            'date4' => $date,
-        ];
-
-        if ($coordId) {
-            $sql .= " AND pl.field_coordinator_id = :cid";
-            $params['cid'] = $coordId;
-        }
-
-        $sql .= " ORDER BY pl.parking_location ASC";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    // LAPORAN BULANAN (Updated: Join Survey Data)
-    public function getMonthlyReport($teamName, $month, $year, $coordId = null)
-    {
-        $sql = "SELECT
-                    pl.id, pl.parking_location, pl.address,
-                    fc.name as coordinator_name,
-                    COALESCE(SUM(td.amount), 0) as total_amount,
-                    COUNT(td.id) as total_trx,
-
-                    -- FIX: Gunakan MAX() agar lolos validasi ONLY_FULL_GROUP_BY
-                    MAX(survey.daily_deposits) as daily_deposits,
-                    MAX(survey.weekend_deposits) as weekend_deposits,
-                    MAX(survey.monthly_deposits) as monthly_deposits
-
-                FROM parking_locations pl
-                JOIN pks_takeovers pt ON pl.field_coordinator_id = pt.field_coordinator_id
-                JOIN field_coordinators fc ON pl.field_coordinator_id = fc.id
-                LEFT JOIN parking_deposits survey ON pl.id = survey.parking_location_id
-                LEFT JOIN takeover_deposits td ON pl.id = td.parking_location_id
-                                              AND MONTH(td.deposit_date) = :m
-                                              AND YEAR(td.deposit_date) = :y
-                                              AND td.takeover_id = pt.id
-                WHERE pt.team_name = :team";
-
-        $params = ['team' => $teamName, 'm' => $month, 'y' => $year];
-
-        if ($coordId) {
-            $sql .= " AND pl.field_coordinator_id = :cid";
-            $params['cid'] = $coordId;
-        }
-
-        // Grouping tetap berdasarkan ID lokasi
-        $sql .= " GROUP BY pl.id ORDER BY pl.parking_location ASC";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 }

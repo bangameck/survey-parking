@@ -11,7 +11,6 @@
     <title><?php echo $title ?? 'Survey Parking'?> - Dashboard</title>
 
     <link rel="stylesheet" href="<?php echo BASE_URL?>/css/style.css">
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
 
@@ -19,9 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        /* Helper untuk AlpineJS */
         [x-cloak] { display: none !important; }
-        /* Font Family Global */
         body { font-family: 'Poppins', sans-serif; }
     </style>
 </head>
@@ -38,103 +35,146 @@
 
             <div class="flex items-center justify-center mt-8">
                 <div class="flex items-center">
-                    <svg class="w-12 h-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg class="w-12 h-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span class="ml-2 text-2xl font-semibold text-gray-800">SURVEY PARKIR</span>
                 </div>
             </div>
 
             <nav class="mt-10">
 
-                <?php if (! isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'team'): ?>
+                <?php
+                    $role = $_SESSION['user_role'] ?? 'guest';
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-700 <?php echo (strpos($_GET['url'], 'admin') !== false) ? 'bg-gray-200' : 'hover:bg-gray-200'?>"
-                        href="<?php echo BASE_URL?>/admin">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 01-1 1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
-                            </path>
-                        </svg>
+                    // FUNGSI HELPER (DIPERBAIKI)
+                    function isActive($keywords, $exclude = null)
+                    {
+                        // Ambil URL langsung dari $_GET agar scope aman
+                        $currentUrl = $_GET['url'] ?? '';
+
+                        if (! is_array($keywords)) {
+                            $keywords = [$keywords];
+                        }
+
+                        // Cek exclude dulu (jika ada kata ini di URL, return false)
+                        if ($exclude && strpos($currentUrl, $exclude) !== false) {
+                            return 'text-gray-500 hover:bg-gray-100 hover:text-gray-700';
+                        }
+
+                        foreach ($keywords as $k) {
+                            // Jika keyword cocok
+                            if (strpos($currentUrl, $k) !== false) {
+                                return 'bg-gray-200 text-gray-900';
+                            }
+                        }
+                        return 'text-gray-500 hover:bg-gray-100 hover:text-gray-700';
+                    }
+                ?>
+
+                <?php if ($role === 'admin'): ?>
+
+                    <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Utama</p>
+
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('admin')?>" href="<?php echo BASE_URL?>/admin">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                         <span class="mx-3">Dashboard</span>
                     </a>
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-500 <?php echo (strpos($_GET['url'], 'fieldcoordinators') !== false) ? 'bg-gray-200 text-gray-700' : 'hover:bg-gray-200 hover:text-gray-700'?>"
-                        href="<?php echo BASE_URL?>/fieldcoordinators">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
-                            </path>
-                        </svg>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('users')?>" href="<?php echo BASE_URL?>/users">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-4 0 4 4 0 014 0z"></path></svg>
+                        <span class="mx-3">Users</span>
+                    </a>
+
+                    <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Data Master</p>
+
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('fieldcoordinators')?>" href="<?php echo BASE_URL?>/fieldcoordinators">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                         <span class="mx-3">Koordinator</span>
                     </a>
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-500 <?php echo (strpos($_GET['url'], 'parkinglocations') !== false) ? 'bg-gray-200 text-gray-700' : 'hover:bg-gray-200 hover:text-gray-700'?>"
-                        href="<?php echo BASE_URL?>/parkinglocations">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
-                            </path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('parkinglocations')?>" href="<?php echo BASE_URL?>/parkinglocations">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                         <span class="mx-3">Lokasi Parkir</span>
                     </a>
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-500 <?php echo (strpos($_GET['url'], 'parkingdeposits') !== false) ? 'bg-gray-200 text-gray-700' : 'hover:bg-gray-200 hover:text-gray-700'?>"
-                        href="<?php echo BASE_URL?>/parkingdeposits">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-                        <span class="mx-3">Input Setoran</span>
+                    <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Operasional</p>
+
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('parkingdeposits')?>" href="<?php echo BASE_URL?>/parkingdeposits">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="mx-3">Input Setoran Survey</span>
                     </a>
 
-                    <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin'): ?>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('takeover')?>" href="<?php echo BASE_URL?>/takeover">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        <span class="mx-3">Takeover PKS</span>
+                    </a>
 
-                        <div class="border-t border-gray-200 my-4 mx-6"></div> <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Admin Zone</p>
+                    <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Laporan & System</p>
 
-                        <a class="flex items-center px-6 py-2 mt-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700 <?php echo (strpos($_GET['url'], 'takeover') !== false) ? 'bg-gray-200 text-gray-700' : ''?>" href="<?php echo BASE_URL?>/takeover">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                            <span class="mx-3">Pengambilalihan PKS</span>
-                        </a>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('reports', 'team/reports')?>" href="<?php echo BASE_URL?>/reports">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="mx-3">Laporan Survey</span>
+                    </a>
 
-                        <a class="flex items-center px-6 py-2 mt-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700 <?php echo (strpos($_GET['url'], 'reports') !== false) ? 'bg-gray-200 text-gray-700' : ''?>" href="<?php echo BASE_URL?>/reports">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span class="mx-3">Laporan / Export</span>
-                        </a>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('team/reports')?>" href="<?php echo BASE_URL?>/team/reports">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        <span class="mx-3">Laporan Setoran</span>
+                    </a>
 
-                        <a class="flex items-center px-6 py-2 mt-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700 <?php echo (strpos($_GET['url'], 'backup') !== false) ? 'bg-gray-200 text-gray-700' : ''?>"
-                            href="<?php echo BASE_URL?>/backup">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7l8 4l8-4m-8 4v10">
-                                </path>
-                            </svg>
-                            <span class="mx-3">Backup Database</span>
-                        </a>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('backup')?>" href="<?php echo BASE_URL?>/backup">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7l8 4l8-4m-8 4v10"></path></svg>
+                        <span class="mx-3">Backup Database</span>
+                    </a>
 
-                    <?php endif; ?>
+                <?php elseif ($role === 'team'): ?>
 
-                <?php endif; ?>
-
-                <?php if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'team'): ?>
-
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-700 <?php echo (strpos($_GET['url'], 'team') !== false && strpos($_GET['url'], 'teaminput') === false && strpos($_GET['url'], 'team/reports') === false) ? 'bg-gray-200' : 'hover:bg-gray-200'?>" href="<?php echo BASE_URL?>/team">
+                    <a class="flex items-center px-6 py-2 mt-4 <?php echo isActive('team') && ! isActive('teaminput') && ! isActive('team/reports') ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-200'?>" href="<?php echo BASE_URL?>/team">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 01-1 1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                         <span class="mx-3">Dashboard Tim</span>
                     </a>
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-700 <?php echo (strpos($_GET['url'], 'teaminput') !== false) ? 'bg-gray-200' : 'hover:bg-gray-200'?>" href="<?php echo BASE_URL?>/teaminput">
+                    <a class="flex items-center px-6 py-2 mt-4 <?php echo isActive('teaminput')?>" href="<?php echo BASE_URL?>/teaminput">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                         <span class="mx-3">Input Setoran</span>
                     </a>
 
-                    <a class="flex items-center px-6 py-2 mt-4 text-gray-700 <?php echo (strpos($_GET['url'], 'team/reports') !== false) ? 'bg-gray-200' : 'hover:bg-gray-200'?>" href="<?php echo BASE_URL?>/team/reports">
+                    <a class="flex items-center px-6 py-2 mt-4 <?php echo isActive('team/reports')?>" href="<?php echo BASE_URL?>/team/reports">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span class="mx-3">Riwayat Setoran</span>
+                        <span class="mx-3">Laporan Setoran</span>
+                    </a>
+
+                <?php elseif ($role === 'pimpinan' || $role === 'bendahara'): ?>
+
+                    <p class="px-6 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Menu Utama</p>
+
+                    <?php $dashboardLink = ($role === 'pimpinan') ? '/pimpinan' : '/bendahara'; ?>
+                    <a class="flex items-center px-6 py-2 <?php echo isActive(['pimpinan', 'bendahara'])?>" href="<?php echo BASE_URL . $dashboardLink?>">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        <span class="mx-3">Dashboard</span>
+                    </a>
+
+                    <a class="flex items-center px-6 py-2 mt-2 <?php echo isActive('fieldcoordinators')?>" href="<?php echo BASE_URL?>/fieldcoordinators">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <span class="mx-3">Koordinator</span>
+                    </a>
+
+                    <a class="flex items-center px-6 py-2 mt-2 <?php echo isActive('parkinglocations')?>" href="<?php echo BASE_URL?>/parkinglocations">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span class="mx-3">Lokasi Parkir</span>
+                    </a>
+
+                    <a class="flex items-center px-6 py-2 mt-2 <?php echo isActive('parkingdeposits')?>" href="<?php echo BASE_URL?>/parkingdeposits">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="mx-3">Data Survey (Read)</span>
+                    </a>
+
+                    <a class="flex items-center px-6 py-2 <?php echo isActive('reports', 'team/reports')?>" href="<?php echo BASE_URL?>/reports">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <span class="mx-3">Laporan Survey</span>
+                    </a>
+
+                    <a class="flex items-center px-6 py-2 mt-4 <?php echo isActive('team/reports')?>" href="<?php echo BASE_URL?>/team/reports">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        <span class="mx-3">Laporan Setoran</span>
                     </a>
 
                 <?php endif; ?>

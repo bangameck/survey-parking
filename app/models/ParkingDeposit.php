@@ -11,7 +11,6 @@ class ParkingDeposit
     }
 
     // Mengambil data deposit yang sudah ada untuk satu koordinator
-    // agar form bisa diisi otomatis jika data sudah pernah diinput
     public function getDepositsByCoordinator($coordinator_id)
     {
         $query = "SELECT pd.* FROM {$this->table} pd
@@ -19,74 +18,7 @@ class ParkingDeposit
                   WHERE pl.field_coordinator_id = :coordinator_id ORDER BY pl.parking_location ASC";
         $stmt = $this->db->prepare($query);
         $stmt->execute(['coordinator_id' => $coordinator_id]);
-
-        // Mengubah hasil menjadi array asosiatif dengan key parking_location_id
-        $results = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_OBJ) as $row) {
-            $results[$row->parking_location_id] = $row;
-        }
-        return $results;
-    }
-
-    // Fungsi utama untuk menyimpan data (UPSERT BATCH)
-    public function upsertBatch($data, $surveyor1, $surveyor2, $documentPath)
-    {
-        $this->db->beginTransaction();
-        try {
-            foreach ($data as $location_id => $deposit) {
-                // Ubah nilai kosong menjadi NULL
-                $daily   = ! empty($deposit['daily_deposits']) ? $deposit['daily_deposits'] : null;
-                $weekend = ! empty($deposit['weekend_deposits']) ? $deposit['weekend_deposits'] : null;
-                $monthly = ! empty($deposit['monthly_deposits']) ? $deposit['monthly_deposits'] : null;
-                $info    = ! empty($deposit['information']) ? $deposit['information'] : null;
-
-                // Hanya proses baris ini jika setidaknya ada satu data yang diisi
-                if ($daily !== null || $weekend !== null || $monthly !== null || $info !== null) {
-
-                    $stmt_check = $this->db->prepare("SELECT id, document_survey FROM {$this->table} WHERE parking_location_id = :location_id");
-                    $stmt_check->execute(['location_id' => $location_id]);
-                    $existing = $stmt_check->fetch(PDO::FETCH_OBJ);
-
-                    // Tentukan path dokumen yang akan disimpan.
-                    // Jika ada file baru diupload, gunakan itu.
-                    // Jika tidak, tapi sudah ada file lama, pertahankan file lama.
-                    // Jika tidak ada keduanya, gunakan NULL.
-                    $finalDocumentPath = $documentPath ?: ($existing->document_survey ?? null);
-
-                    if ($existing) {
-                        // Jika ada, UPDATE
-                        $query = "UPDATE {$this->table} SET
-                                daily_deposits = :daily, weekend_deposits = :weekend, monthly_deposits = :monthly,
-                                information = :info, surveyor_1 = :s1, surveyor_2 = :s2, document_survey = :doc
-                              WHERE id = :id";
-                        $stmt = $this->db->prepare($query);
-                        $stmt->execute([
-                            'daily' => $daily, 'weekend' => $weekend, 'monthly' => $monthly,
-                            'info'  => $info, 's1'       => $surveyor1, 's2'    => $surveyor2, 'doc' => $finalDocumentPath,
-                            'id'    => $existing->id,
-                        ]);
-                    } else {
-                        // Jika tidak ada, INSERT
-                        $query = "INSERT INTO {$this->table}
-                                (parking_location_id, daily_deposits, weekend_deposits, monthly_deposits, information, surveyor_1, surveyor_2, document_survey)
-                              VALUES
-                                (:loc_id, :daily, :weekend, :monthly, :info, :s1, :s2, :doc)";
-                        $stmt = $this->db->prepare($query);
-                        $stmt->execute([
-                            'loc_id' => $location_id, 'daily' => $daily, 'weekend' => $weekend, 'monthly' => $monthly,
-                            'info'   => $info, 's1'           => $surveyor1, 's2'  => $surveyor2, 'doc'   => $finalDocumentPath,
-                        ]);
-                    }
-                }
-            }
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            // DEBUG: Simpan pesan error asli dari database ke session untuk ditampilkan di Toastr
-            $_SESSION['flash'] = ['type' => 'error', 'message' => 'DB Error: ' . $e->getMessage()];
-            return false; // Tetap return false agar alur tidak berubah
-        }
+        return $stmt->fetchAll(PDO::FETCH_OBJ);
     }
 
     public function getByLocationId($location_id)
@@ -98,7 +30,6 @@ class ParkingDeposit
 
     public function getSurveyedLocationsCount()
     {
-        // COUNT(DISTINCT ...) memastikan setiap lokasi hanya dihitung sekali
         $query = "SELECT COUNT(DISTINCT parking_location_id) FROM {$this->table}";
         $stmt  = $this->db->prepare($query);
         $stmt->execute();
@@ -117,4 +48,77 @@ class ParkingDeposit
         return $stmt->fetch(PDO::FETCH_OBJ);
     }
 
+    // --- FUNGSI UTAMA: SIMPAN DATA (LEBIH TANGGUH) ---
+    public function upsertBatch($data, $surveyor1, $surveyor2, $documentPath)
+    {
+        $this->db->beginTransaction();
+        try {
+            $checkSql  = "SELECT id, document_survey FROM {$this->table} WHERE parking_location_id = :loc_id";
+            $stmtCheck = $this->db->prepare($checkSql);
+
+            $insertSql = "INSERT INTO {$this->table} (
+                            parking_location_id, daily_deposits, weekend_deposits, monthly_deposits,
+                            surveyor_1, surveyor_2, document_survey, created_at
+                          ) VALUES (
+                            :loc_id, :daily, :weekend, :monthly,
+                            :surv1, :surv2, :doc, NOW()
+                          )";
+            $stmtInsert = $this->db->prepare($insertSql);
+
+            $updateSql = "UPDATE {$this->table} SET
+                            daily_deposits = :daily,
+                            weekend_deposits = :weekend,
+                            monthly_deposits = :monthly,
+                            surveyor_1 = :surv1,
+                            surveyor_2 = :surv2,
+                            document_survey = :doc
+                          WHERE id = :id";
+            $stmtUpdate = $this->db->prepare($updateSql);
+
+            foreach ($data as $locationId => $row) {
+                $daily   = (float) str_replace('.', '', $row['daily'] ?? 0);
+                $weekend = (float) str_replace('.', '', $row['weekend'] ?? 0);
+                $monthly = (float) str_replace('.', '', $row['monthly'] ?? 0);
+
+                $stmtCheck->execute(['loc_id' => $locationId]);
+                $existingData = $stmtCheck->fetch(PDO::FETCH_OBJ);
+
+                $finalDocPath = $documentPath ? $documentPath : ($existingData->document_survey ?? null);
+
+                if ($existingData) {
+                    // UPDATE
+                    $stmtUpdate->execute([
+                        'daily'   => $daily,
+                        'weekend' => $weekend,
+                        'monthly' => $monthly,
+                        'surv1'   => $surveyor1,
+                        'surv2'   => $surveyor2,
+                        'doc'     => $finalDocPath,
+                        'id'      => $existingData->id,
+                    ]);
+                } else {
+                    // INSERT - Perbaikan logika: simpan jika ada surveyor/doc walau uang 0
+                    if ($daily > 0 || $weekend > 0 || $monthly > 0 || $finalDocPath || ! empty($surveyor1) || ! empty($surveyor2)) {
+                        $stmtInsert->execute([
+                            'loc_id'  => $locationId,
+                            'daily'   => $daily,
+                            'weekend' => $weekend,
+                            'monthly' => $monthly,
+                            'surv1'   => $surveyor1,
+                            'surv2'   => $surveyor2,
+                            'doc'     => $finalDocPath,
+                        ]);
+                    }
+                }
+            }
+
+            $this->db->commit();
+            return true;
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'DB Error: ' . $e->getMessage()];
+            return false;
+        }
+    }
 }

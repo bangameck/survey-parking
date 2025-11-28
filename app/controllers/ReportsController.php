@@ -12,8 +12,10 @@ class ReportsController extends Controller
 {
     public function __construct()
     {
-        // Middleware: Hanya Admin yang boleh akses laporan
-        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
+        // UPDATE: Izinkan Admin, Pimpinan, dan Bendahara
+        $allowedRoles = ['admin', 'pimpinan', 'bendahara'];
+
+        if (! isset($_SESSION['user_id']) || ! in_array($_SESSION['user_role'], $allowedRoles)) {
             $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses ditolak.'];
             $this->redirect('auth/login');
         }

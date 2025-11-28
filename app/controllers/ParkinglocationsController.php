@@ -1,22 +1,22 @@
 <?php
 
-// Gunakan namespace dari PhpSpreadsheet
 use Dompdf\Dompdf;
+use Dompdf\Options;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ParkinglocationsController extends Controller
 {
     public function __construct()
     {
-        // Middleware: Cek apakah user sudah login
-        if (! isset($_SESSION['user_id'])) {
-            $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Anda harus login terlebih dahulu.'];
+        // UPDATE: Izinkan Admin, Pimpinan, dan Bendahara masuk
+        $allowedRoles = ['admin', 'pimpinan', 'bendahara'];
+
+        if (! isset($_SESSION['user_id']) || ! in_array($_SESSION['user_role'], $allowedRoles)) {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses ditolak.'];
             $this->redirect('auth/login');
         }
     }
 
-    // Menampilkan halaman utama (daftar lokasi)
-    // Ganti fungsi index() yang lama dengan ini
     public function index()
     {
         $locationModel    = $this->model('ParkingLocation');
@@ -26,40 +26,40 @@ class ParkinglocationsController extends Controller
         $page   = isset($_GET['page']) ? (int) $_GET['page'] : 1;
         $offset = ($page - 1) * $limit;
 
-        // Ambil filter koordinator DAN kata kunci pencarian
         $selected_coordinator = isset($_GET['coordinator_id']) && ! empty($_GET['coordinator_id']) ? $_GET['coordinator_id'] : null;
         $searchTerm           = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
 
-        // Hitung total data dengan filter dan pencarian
         $total_results = $locationModel->getTotalCount($selected_coordinator, $searchTerm);
         $total_pages   = ceil($total_results / $limit);
 
-        // Ambil data yang sudah dipaginasi dan difilter/dicari
         $locations = $locationModel->getPaginated($limit, $offset, $selected_coordinator, $searchTerm);
 
-        // Siapkan data untuk dikirim ke view
         $data['locations']    = $locations;
         $data['coordinators'] = $coordinatorModel->getAll();
         $data['title']        = 'Manajemen Lokasi Parkir';
         $data['csrf_token']   = $this->generateCsrf();
 
-        // Data untuk pagination dan filter
         $data['page']                 = $page;
         $data['total_pages']          = $total_pages;
         $data['selected_coordinator'] = $selected_coordinator;
-        $data['searchTerm']           = $searchTerm; // Kirim kata kunci pencarian ke view
+        $data['searchTerm']           = $searchTerm;
 
         $this->view('layouts/header', $data);
         $this->view('parking_locations/index', $data);
         $this->view('layouts/footer');
     }
-    // Menyimpan satu lokasi baru dari modal
+
     public function store()
     {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_role'] === 'admin') {
-            if (! $this->verifyCsrf($_POST['csrf_token'])) {
-                die('CSRF token validation failed.');
-            }
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menambah data.'];
+            $this->redirect('parkinglocations');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (! $this->verifyCsrf($_POST['csrf_token'])) {die('CSRF token validation failed.');}
 
             $locationModel = $this->model('ParkingLocation');
             if ($locationModel->create($_POST)) {
@@ -71,33 +71,17 @@ class ParkinglocationsController extends Controller
         $this->redirect('parkinglocations');
     }
 
-    // FUNGSI BARU: Mengambil data satu lokasi sebagai JSON untuk modal edit
-    public function getParkingLocationJson($id)
-    {
-        header('Content-Type: application/json');
-        if ($_SESSION['user_role'] !== 'admin') {
-            http_response_code(403);
-            echo json_encode(['error' => 'Akses ditolak']);
-            exit();
-        }
-        $locationModel = $this->model('ParkingLocation');
-        $location      = $locationModel->getById($id);
-        if ($location) {
-            echo json_encode($location);
-        } else {
-            http_response_code(404);
-            echo json_encode(['error' => 'Lokasi tidak ditemukan']);
-        }
-        exit();
-    }
-
-    // Mengupdate data dari modal edit
     public function update($id)
     {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_role'] === 'admin') {
-            if (! $this->verifyCsrf($_POST['csrf_token'])) {
-                die('CSRF token validation failed.');
-            }
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh mengubah data.'];
+            $this->redirect('parkinglocations');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (! $this->verifyCsrf($_POST['csrf_token'])) {die('CSRF token validation failed.');}
 
             $locationModel = $this->model('ParkingLocation');
             if ($locationModel->update($id, $_POST)) {
@@ -111,14 +95,17 @@ class ParkinglocationsController extends Controller
 
     public function destroy($id)
     {
-        // Pastikan hanya admin yang bisa menghapus dan requestnya adalah POST
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menghapus data.'];
+            $this->redirect('parkinglocations');
+            return;
+        }
 
-            // Verifikasi CSRF token
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (! isset($_POST['csrf_token']) || ! $this->verifyCsrf($_POST['csrf_token'])) {
                 $_SESSION['flash'] = ['type' => 'error', 'message' => 'CSRF token tidak valid.'];
-                $this->redirect('parkinglocations');
-                return;
+                $this->redirect('parkinglocations');return;
             }
 
             $locationModel = $this->model('ParkingLocation');
@@ -128,95 +115,36 @@ class ParkinglocationsController extends Controller
                 $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus lokasi parkir.'];
             }
             $this->redirect('parkinglocations');
-
         } else {
-            // Jika bukan admin atau bukan POST, tolak akses
             $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses tidak sah.'];
             $this->redirect('parkinglocations');
         }
     }
 
-    // FUNGSI BARU: Memproses file import
-    public function import()
-    {
-        ini_set("auto_detect_line_endings", true);
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_role'] === 'admin') {
-            if (! $this->verifyCsrf($_POST['csrf_token'])) {
-                die('CSRF token validation failed.');
-            }
+    // =========================================================================
+    // API JSON (DIAKSES OLEH ADMIN & PIMPINAN)
+    // =========================================================================
 
-            if (isset($_FILES['import_file']) && $_FILES['import_file']['error'] == 0) {
-                $file           = $_FILES['import_file']['tmp_name'];
-                $coordinator_id = $_POST['field_coordinator_id'];
-
-                try {
-                    // --- BLOK KODE YANG DIPERBARUI ---
-                    $inputFileType = IOFactory::identify($file);
-                    $reader        = IOFactory::createReader($inputFileType);
-
-                    if ($inputFileType == 'Csv') {
-                        $reader->setDelimiter(';');
-                        $reader->setInputEncoding('UTF-8');
-                    }
-                    $spreadsheet = $reader->load($file);
-                    // --- AKHIR BLOK KODE YANG DIPERBARUI ---
-
-                    $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
-
-                    $locationsToInsert = [];
-                    for ($row = 2; $row <= count($sheetData); $row++) {
-                        $locationName = trim($sheetData[$row]['A']);
-                        $address      = trim($sheetData[$row]['B']);
-
-                        if (! empty($locationName) && ! empty($address)) {
-                            $locationsToInsert[] = [
-                                'field_coordinator_id' => $coordinator_id,
-                                'parking_location'     => $locationName,
-                                'address'              => $address,
-                            ];
-                        }
-                    }
-
-                    if (! empty($locationsToInsert)) {
-                        $locationModel = $this->model('ParkingLocation');
-                        if ($locationModel->createBatch($locationsToInsert)) {
-                            $_SESSION['flash'] = ['type' => 'success', 'message' => count($locationsToInsert) . ' lokasi berhasil diimpor.'];
-                        } else {
-                            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menyimpan data ke database.'];
-                        }
-                    } else {
-                        $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Tidak ada data valid untuk diimpor. Pastikan file tidak kosong dan formatnya benar.'];
-                    }
-
-                } catch (Exception $e) {
-                    $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal membaca file. Error: ' . $e->getMessage()];
-                }
-
-            } else {
-                $_SESSION['flash'] = ['type' => 'error', 'message' => 'File tidak valid atau gagal diupload.'];
-            }
-            $this->redirect('parkinglocations');
-        }
-    }
-
-    public function searchJson()
+    public function getParkingLocationJson($id)
     {
         header('Content-Type: application/json');
-        $term = $_GET['q'] ?? '';
+        // Khusus get data edit, biasanya admin. Tapi Pimpinan bisa saja perlu detail.
+        // Kita buka saja untuk read.
 
         $locationModel = $this->model('ParkingLocation');
-        // Kita perlu method baru di model untuk ini
-        $results = $locationModel->searchByName($term);
-
-        echo json_encode($results);
+        $location      = $locationModel->getById($id);
+        if ($location) {
+            echo json_encode($location);
+        } else {
+            http_response_code(404);
+            echo json_encode(['error' => 'Lokasi tidak ditemukan']);
+        }
         exit();
     }
 
-// METHOD BARU: Untuk mengambil detail lengkap satu lokasi
     public function getLocationDetailsJson($id)
     {
         header('Content-Type: application/json');
-
         $locationModel = $this->model('ParkingLocation');
         $depositModel  = $this->model('ParkingDeposit');
 
@@ -225,16 +153,12 @@ class ParkinglocationsController extends Controller
 
         if ($location) {
             $details['location'] = $location;
-            // Ambil juga data deposit yang berelasi
-            // Kita perlu method baru di model untuk ini
-            $deposits = $depositModel->getByLocationId($id);
+            $deposits            = $depositModel->getByLocationId($id);
 
-            // Filter informasi berdasarkan role user
-            if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
-                // Admin dapat melihat semua data
+            // PERBAIKAN: Izinkan Admin, Pimpinan, dan Bendahara melihat detail uang
+            if (in_array($_SESSION['user_role'], ['admin', 'pimpinan', 'bendahara'])) {
                 $details['deposits'] = $deposits;
             } else {
-                // Guest tidak melihat data sensitif
                 $details['deposits'] = null;
             }
             echo json_encode($details);
@@ -245,62 +169,6 @@ class ParkinglocationsController extends Controller
         exit();
     }
 
-    // FUNGSI BARU: Endpoint JSON untuk pencarian alamat (jalan)
-    public function searchAddressJson()
-    {
-        header('Content-Type: application/json');
-        $term = $_GET['q'] ?? '';
-
-        if (strlen($term) < 3) {
-            echo json_encode([]); // Jangan cari jika input terlalu pendek
-            exit();
-        }
-
-        $locationModel = $this->model('ParkingLocation');
-        $results       = $locationModel->searchAddress($term);
-
-        echo json_encode($results);
-        exit();
-    }
-
-// FUNGSI BARU: Endpoint JSON untuk mengambil lokasi berdasarkan alamat (jalan)
-    public function getLocationsByAddressJson()
-    {
-        header('Content-Type: application/json');
-        $address = $_GET['address'] ?? '';
-
-        if (empty($address)) {
-            echo json_encode(['error' => 'Alamat tidak boleh kosong']);
-            exit();
-        }
-
-        $locationModel = $this->model('ParkingLocation');
-        $results       = $locationModel->getByAddress($address);
-
-        echo json_encode($results);
-        exit();
-    }
-
-    public function searchCoordinatorsJson()
-    {
-        header('Content-Type: application/json');
-        $term = $_GET['q'] ?? '';
-
-        if (strlen($term) < 2) {
-            echo json_encode([]);
-            exit();
-        }
-
-        // Kita panggil model FieldCoordinator di sini
-        $coordinatorModel = $this->model('FieldCoordinator');
-        $results          = $coordinatorModel->searchByName($term);
-
-        echo json_encode($results);
-        exit();
-    }
-
-// FUNGSI BARU: Endpoint JSON untuk mengambil semua lokasi milik satu koordinator
-    // Ganti fungsi getLocationsByCoordinatorJson() yang lama dengan ini
     public function getLocationsByCoordinatorJson($coordinator_id)
     {
         header('Content-Type: application/json');
@@ -313,12 +181,10 @@ class ParkinglocationsController extends Controller
         $locationModel = $this->model('ParkingLocation');
         $results       = [];
 
-        // Cek role user. Jika admin, kirim data lengkap. Jika guest, kirim data terbatas.
-        if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
-            // Admin mendapat data lengkap dengan setoran (menggunakan fungsi yang sudah kita buat)
+        // Pimpinan & Bendahara juga boleh lihat detail lengkap (untuk kalkulasi total di dashboard)
+        if (in_array($_SESSION['user_role'], ['admin', 'pimpinan', 'bendahara'])) {
             $results = $locationModel->getDetailsByCoordinatorId($coordinator_id);
         } else {
-            // Guest hanya mendapat data lokasi dasar (tanpa setoran)
             $results = $locationModel->getPaginated(1000, 0, $coordinator_id);
         }
 
@@ -326,27 +192,205 @@ class ParkinglocationsController extends Controller
         exit();
     }
 
-    public function export_pdf()
+    public function searchJson()
     {
-        // Pastikan hanya admin yang bisa akses
-        if (! isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-            die('Akses ditolak.');
+        header('Content-Type: application/json');
+        $term          = $_GET['q'] ?? '';
+        $locationModel = $this->model('ParkingLocation');
+        $results       = $locationModel->searchByName($term);
+        echo json_encode($results);
+        exit();
+    }
+
+    public function searchAddressJson()
+    {
+        header('Content-Type: application/json');
+        $term = $_GET['q'] ?? '';
+        if (strlen($term) < 3) {echo json_encode([]);exit();}
+        $locationModel = $this->model('ParkingLocation');
+        $results       = $locationModel->searchAddress($term);
+        echo json_encode($results);
+        exit();
+    }
+
+    public function getLocationsByAddressJson()
+    {
+        header('Content-Type: application/json');
+        $address = $_GET['address'] ?? '';
+        if (empty($address)) {echo json_encode(['error' => 'Alamat tidak boleh kosong']);exit();}
+        $locationModel = $this->model('ParkingLocation');
+        $results       = $locationModel->getByAddress($address);
+        echo json_encode($results);
+        exit();
+    }
+
+    public function searchCoordinatorsJson()
+    {
+        header('Content-Type: application/json');
+        $term = $_GET['q'] ?? '';
+        if (strlen($term) < 2) {echo json_encode([]);exit();}
+        $coordinatorModel = $this->model('FieldCoordinator');
+        $results          = $coordinatorModel->searchByName($term);
+        echo json_encode($results);
+        exit();
+    }
+
+    // =========================================================================
+    // FITUR LAIN (IMPORT & BATCH ACTION)
+    // =========================================================================
+
+    public function import()
+    {
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh melakukan import.'];
+            $this->redirect('parkinglocations');
+            return;
         }
 
-        // Ambil filter dan kata kunci pencarian dari URL
-        $coordinator_id = isset($_GET['coordinator_id']) && ! empty($_GET['coordinator_id']) ? $_GET['coordinator_id'] : null;
-        $searchTerm     = isset($_GET['q']) && ! empty($_GET['q']) ? $_GET['q'] : null;
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (! $this->verifyCsrf($_POST['csrf_token'])) {die('CSRF token validation failed.');}
+
+            if (isset($_FILES['import_file']) && $_FILES['import_file']['error'] == 0) {
+                $file           = $_FILES['import_file']['tmp_name'];
+                $coordinator_id = $_POST['field_coordinator_id'];
+                $default_zone   = ! empty($_POST['default_zone']) ? $_POST['default_zone'] : null;
+
+                try {
+                    $spreadsheet = IOFactory::load($file);
+                    $sheetData   = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
+
+                    $locationsToInsert = [];
+                    foreach ($sheetData as $index => $row) {
+                        if ($index == 1) {
+                            continue;
+                        }
+
+                        $locationName = trim($row['A']);
+                        $address      = trim($row['B']);
+                        $excelZone    = isset($row['C']) ? trim($row['C']) : null;
+                        $finalZone    = ! empty($excelZone) ? $excelZone : $default_zone;
+
+                        if (! empty($locationName)) {
+                            $locationsToInsert[] = [
+                                'field_coordinator_id' => $coordinator_id,
+                                'parking_location'     => $locationName,
+                                'address'              => $address,
+                                'zone'                 => $finalZone,
+                            ];
+                        }
+                    }
+
+                    if (! empty($locationsToInsert)) {
+                        $locationModel = $this->model('ParkingLocation');
+                        if ($locationModel->createBatch($locationsToInsert)) {
+                            $_SESSION['flash'] = ['type' => 'success', 'message' => count($locationsToInsert) . ' lokasi berhasil diimpor!'];
+                        } else {
+                            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menyimpan data ke database.'];
+                        }
+                    } else {
+                        $_SESSION['flash'] = ['type' => 'warning', 'message' => 'File kosong atau format salah.'];
+                    }
+
+                } catch (Exception $e) {
+                    $_SESSION['flash'] = ['type' => 'error', 'message' => 'Error: ' . $e->getMessage()];
+                }
+            } else {
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'File wajib diupload.'];
+            }
+        }
+        $this->redirect('parkinglocations');
+    }
+
+    public function updateBatch()
+    {
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh melakukan aksi massal.'];
+            $this->redirect('parkinglocations');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (! $this->verifyCsrf($_POST['csrf_token'])) {die('Token Invalid');}
+
+            $location_ids = $_POST['location_ids'] ?? [];
+            $bulk_zone    = $_POST['bulk_zone'] ?? null;
+
+            if (empty($location_ids) || empty($bulk_zone)) {
+                $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Pilih lokasi dan zona tujuan terlebih dahulu.'];
+                $this->redirect('parkinglocations');return;
+            }
+
+            $locationModel = $this->model('ParkingLocation');
+            if ($locationModel->updateBatch($location_ids, $bulk_zone)) {
+                $_SESSION['flash'] = ['type' => 'success', 'message' => count($location_ids) . ' lokasi berhasil diubah.'];
+            } else {
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal update massal.'];
+            }
+
+            $q        = $_POST['q_hidden'] ?? '';
+            $coord_id = $_POST['coordinator_id_hidden'] ?? '';
+            $params   = http_build_query(['q' => $q, 'coordinator_id' => $coord_id]);
+            $this->redirect('parkinglocations?' . $params);
+
+        } else {
+            $this->redirect('parkinglocations');
+        }
+    }
+
+    public function destroyBatch()
+    {
+        // PROTEKSI: Hanya Admin
+        if ($_SESSION['user_role'] !== 'admin') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Hanya Admin yang boleh menghapus data.'];
+            $this->redirect('parkinglocations');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (! $this->verifyCsrf($_POST['csrf_token'])) {die('Token Invalid');}
+
+            $location_ids = $_POST['location_ids'] ?? [];
+            if (empty($location_ids)) {
+                $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Tidak ada lokasi yang dipilih.'];
+                $this->redirect('parkinglocations');return;
+            }
+            $locationModel = $this->model('ParkingLocation');
+            if ($locationModel->deleteBatch($location_ids)) {
+                $_SESSION['flash'] = ['type' => 'success', 'message' => count($location_ids) . ' lokasi berhasil dihapus.'];
+            } else {
+                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus massal.'];
+            }
+
+            $q        = $_POST['q_hidden'] ?? '';
+            $coord_id = $_POST['coordinator_id_hidden'] ?? '';
+            $params   = http_build_query(['q' => $q, 'coordinator_id' => $coord_id]);
+            $this->redirect('parkinglocations?' . $params);
+        } else {
+            $this->redirect('parkinglocations');
+        }
+    }
+
+    public function export_pdf()
+    {
+        // Akses: Admin, Pimpinan, Bendahara
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
+        $coordinator_id = isset($_GET['coordinator_id']) ? $_GET['coordinator_id'] : null;
+        $searchTerm     = isset($_GET['q']) ? $_GET['q'] : null;
 
         $locationModel = $this->model('ParkingLocation');
-
-        // Ambil SEMUA data yang cocok (bukan paginasi) dengan filter yang aktif
-        $locations = $locationModel->getPaginated(9999, 0, $coordinator_id, $searchTerm);
+        $locations     = $locationModel->getPaginated(9999, 0, $coordinator_id, $searchTerm);
 
         $data['locations']  = $locations;
         $data['title']      = 'Laporan Lokasi Parkir';
         $data['searchTerm'] = $searchTerm;
 
-        // Ambil nama koordinator untuk ditampilkan di judul laporan
         $data['coordinator_name'] = null;
         if ($coordinator_id) {
             $coordinatorModel         = $this->model('FieldCoordinator');
@@ -354,71 +398,19 @@ class ParkinglocationsController extends Controller
             $data['coordinator_name'] = $coordinator->name;
         }
 
-        // Render view PDF ke dalam sebuah variabel string
         ob_start();
         $this->view('parking_locations/pdf_template', $data);
         $html = ob_get_clean();
 
-        // Inisialisasi Dompdf
-        $dompdf = new Dompdf();
-        $dompdf->set_option('author', 'Aplikasi Survey UPT Perparkiran');
-        $dompdf->add_info('Creator', 'https://survey.uptperparkiranpku.com');
+        $options = new Options();
+        $options->set('isPhpEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
-
-        $customPaper = [0, 0, 595.28, 935.43];
-
-        // Terapkan ukuran F4 dengan orientasi portrait
-        $dompdf->setPaper($customPaper, 'landscape');
-
-        // Render HTML sebagai PDF
+        $dompdf->setPaper('F4', 'landscape');
         $dompdf->render();
-
-        $fileName = "laporan-lokasi-parkir-" . date('Y-m-d') . ".pdf";
-        $dompdf->stream($fileName, ["Attachment" => false]);
+        $dompdf->stream("Laporan-Lokasi-" . date('Y-m-d') . ".pdf", ["Attachment" => false]);
         exit();
-    }
-
-    // FUNGSI BARU: Menghapus data secara massal
-    public function destroyBatch()
-    {
-        // Pastikan hanya admin yang bisa menghapus dan requestnya adalah POST
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin') {
-
-            // Verifikasi CSRF token
-            if (! isset($_POST['csrf_token']) || ! $this->verifyCsrf($_POST['csrf_token'])) {
-                $_SESSION['flash'] = ['type' => 'error', 'message' => 'CSRF token tidak valid.'];
-                $this->redirect('parkinglocations');
-                return;
-            }
-
-            // Ambil array ID dari form
-            $location_ids = $_POST['location_ids'] ?? [];
-
-            if (empty($location_ids)) {
-                $_SESSION['flash'] = ['type' => 'warning', 'message' => 'Tidak ada lokasi yang dipilih untuk dihapus.'];
-                $this->redirect('parkinglocations');
-                return;
-            }
-
-            // Panggil model untuk menghapus secara batch
-            $locationModel = $this->model('ParkingLocation');
-            if ($locationModel->deleteBatch($location_ids)) {
-                $_SESSION['flash'] = ['type' => 'success', 'message' => count($location_ids) . ' lokasi parkir berhasil dihapus.'];
-            } else {
-                $_SESSION['flash'] = ['type' => 'error', 'message' => 'Gagal menghapus beberapa lokasi parkir.'];
-            }
-
-            // Ambil filter yang sedang aktif dari form untuk redirect
-            $q        = $_POST['q_hidden'] ?? '';
-            $coord_id = $_POST['coordinator_id_hidden'] ?? '';
-            $params   = http_build_query(['q' => $q, 'coordinator_id' => $coord_id]);
-
-            // Redirect kembali ke halaman index dengan filter yang sama
-            $this->redirect('parkinglocations?' . $params);
-
-        } else {
-            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Akses tidak sah.'];
-            $this->redirect('parkinglocations');
-        }
     }
 }

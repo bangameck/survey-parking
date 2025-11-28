@@ -57,7 +57,7 @@
                 $percentage = ($total_locations > 0) ? ($total_surveyed_locations / $total_locations) * 100 : 0;
             ?>
             <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                                                                                     <?php echo round($percentage) ?>%"></div>
+                <div class="bg-green-500 h-2.5 rounded-full" style="width:                                                                                                                                                                                                                               <?php echo round($percentage) ?>%"></div>
             </div>
             <p class="text-xs text-right text-gray-500 mt-1"><?php echo round($percentage) ?>% Selesai</p>
         </div>
@@ -284,7 +284,7 @@
             coordinatorResults: [],
             selectedCoordinatorName: '',
             totalSetoran: { daily: 0, weekend: 0, monthly: 0 },
-            isAdmin:                                         <?php echo($_SESSION['user_role'] === 'admin') ? 'true' : 'false' ?>,
+            isAdmin:                                                             <?php echo($_SESSION['user_role'] === 'admin') ? 'true' : 'false' ?>,
 
             // VARIABEL UNTUK LOADING & EXPORT
             isLoading: false,
